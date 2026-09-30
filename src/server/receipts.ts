@@ -521,3 +521,52 @@ export async function listHistory(
         : null,
   };
 }
+
+const SECRET_KEY = /token|secret|password|passwd|authorization|cookie|api[-_]?key|credential/i;
+const SECRET_VALUE =
+  /xox[abprs]-|gh[pousr]_[A-Za-z0-9]|ya29\.|Bearer\s+\S|-----BEGIN|AKIA[0-9A-Z]{12}/;
+
+/** Fails closed: if anything credential-shaped is found in an export, nothing is exported. */
+export function assertNoSecrets(value: unknown, path = "$"): void {
+  if (typeof value === "string") {
+    if (SECRET_VALUE.test(value))
+      throw new Error(`Export blocked: credential-like value at ${path}`);
+  } else if (Array.isArray(value)) value.forEach((v, i) => assertNoSecrets(v, `${path}[${i}]`));
+  else if (value && typeof value === "object") {
+    for (const [k, v] of Object.entries(value)) {
+      if (SECRET_KEY.test(k)) throw new Error(`Export blocked: sensitive key at ${path}.${k}`);
+      assertNoSecrets(v, `${path}.${k}`);
+    }
+  }
+}
+
+export type ReceiptExport = {
+  format: "ai-action-inbox.receipt";
+  version: 1;
+  exportedAt: string;
+  exportedBy: string;
+  notice: string;
+  receipts: ReceiptBody[];
+};
+
+/** Structured export of a receipt and its whole correction chain. Authorized, scrubbed, no message bodies. */
+export async function exportReceipt(
+  actorId: string,
+  workspaceId: string,
+  receiptId: string,
+): Promise<{ filename: string; json: string }> {
+  const r = await getReceipt(actorId, workspaceId, receiptId);
+  const chain = await getReceiptsForProposal(actorId, workspaceId, r.body.proposal.id);
+  const [u] = await getDb().select({ name: users.name }).from(users).where(eq(users.id, actorId));
+  const doc: ReceiptExport = {
+    format: "ai-action-inbox.receipt",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    exportedBy: u?.name ?? "unknown",
+    notice:
+      "A record kept by AI Action Inbox. It is not a legal or cryptographic attestation. Message bodies and credentials are never included.",
+    receipts: chain.map((c) => c.body),
+  };
+  assertNoSecrets(doc);
+  return { filename: `${r.body.receiptNumber}.json`, json: JSON.stringify(doc, null, 2) };
+}

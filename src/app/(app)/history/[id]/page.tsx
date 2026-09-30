@@ -30,7 +30,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
         <Link href="/history" className="btn btn-sm">
           ← History
         </Link>
-        <Link href={`/history/${id}/print`} className="btn btn-sm">
+        <Link href={`/receipts/${id}/print`} className="btn btn-sm">
           Print view
         </Link>
         <a href={`/api/receipts/${id}/export`} className="btn btn-sm" download>
