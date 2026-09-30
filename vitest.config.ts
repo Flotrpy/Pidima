@@ -12,6 +12,7 @@ export default defineConfig({
         process.env.TEST_DATABASE_URL ??
         "postgres://postgres:postgres@localhost:5432/action_inbox_test",
       BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret-1234",
+      CREDENTIAL_ENCRYPTION_KEY_V1: Buffer.alloc(32, 1).toString("base64"),
       SMTP_URL: "smtp://unused.test",
       SMTP_FROM: "test@example.test",
     },
