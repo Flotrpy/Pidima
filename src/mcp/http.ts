@@ -38,7 +38,7 @@ function corsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-/** Builds the WWW-Authenticate challenge. Resource-metadata discovery is added in P1-023. */
+/** WWW-Authenticate challenge pointing clients at the protected-resource metadata (RFC 9728). */
 export function challenge(resourceMetadataUrl?: string): string {
   return resourceMetadataUrl ? `Bearer resource_metadata="${resourceMetadataUrl}"` : "Bearer";
 }
