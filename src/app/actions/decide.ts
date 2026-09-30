@@ -3,8 +3,20 @@
 import { revalidatePath } from "next/cache";
 import { requireActiveContext } from "@/server/active-workspace";
 import { DecisionError, decideProposal } from "@/server/decisions";
+import { startExecutor } from "@/server/executor";
+import { getProposalDetail } from "@/server/inbox";
 
 export type DecideState = { ok: boolean; message: string } | null;
+
+const OUTCOME_TEXT: Record<string, string> = {
+  SUCCEEDED: "Approved and completed. The provider confirmed the result; see the receipt below.",
+  FAILED:
+    "Approved, but it did not complete. Nothing further will be attempted automatically; see the reason below.",
+  OUTCOME_UNKNOWN:
+    "Approved, but the provider did not confirm the result. Verify at the destination before trying again.",
+  EXECUTING: "Approved and running now. Refresh in a moment to see the result.",
+  APPROVED: "Approved. Execution is about to start.",
+};
 
 const MESSAGES = {
   approved: "Approved. Execution will start shortly; the result and receipt appear on this page.",
@@ -16,6 +28,7 @@ const MESSAGES = {
 } as const;
 
 export async function decideAction(_: DecideState, form: FormData): Promise<DecideState> {
+  startExecutor();
   const { user, workspace } = await requireActiveContext();
   const decision = String(form.get("decision"));
   if (decision !== "approve" && decision !== "deny" && decision !== "cancel")
@@ -32,6 +45,12 @@ export async function decideAction(_: DecideState, form: FormData): Promise<Deci
     });
     revalidatePath(`/inbox/${proposalId}`);
     revalidatePath("/inbox");
+    // Execution ran inline after approval, so report what actually happened, not what we hope happened.
+    if (r.status === "approved" || r.status === "already_approved") {
+      const d = await getProposalDetail(user.id, workspace.id, proposalId).catch(() => null);
+      if (d)
+        return { ok: d.state !== "FAILED", message: OUTCOME_TEXT[d.state] ?? MESSAGES[r.status] };
+    }
     return { ok: true, message: MESSAGES[r.status] };
   } catch (e) {
     revalidatePath(`/inbox/${proposalId}`);

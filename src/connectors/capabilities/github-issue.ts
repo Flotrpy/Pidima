@@ -46,6 +46,7 @@ export const githubIssue: CapabilityDefinition<GithubIssueArgs> = {
   consequences: (a) => [
     `A new issue will be created in ${a.owner}/${a.repo}.`,
     "Everyone with access to the repository can see it, and repository members may be notified.",
+    "A hidden comment identifying this proposal is appended to the body so the system can confirm the issue exists if GitHub's response is lost.",
   ],
   safeSummary: (a) => `Create GitHub issue in ${a.owner}/${a.repo}`,
 };

@@ -150,4 +150,80 @@ export class GithubClient {
     if (!info) throw new ConnectorError("provider_rejected", "Unexpected response from GitHub");
     return info;
   }
+
+  /**
+   * Creates one issue. This is the only write in the GitHub connector. It is never retried by the
+   * transport (writes get a single attempt), and an ambiguous failure surfaces as maybeDispatched.
+   */
+  async createIssue(
+    owner: string,
+    repo: string,
+    issue: { title: string; body: string; labels: string[] },
+  ): Promise<{ id: string; number: number; url: string }> {
+    const { res } = await this.request(
+      `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          title: issue.title,
+          body: issue.body,
+          ...(issue.labels.length ? { labels: issue.labels } : {}),
+        }),
+      },
+    );
+    if (res.status !== 201) throw this.errorFor(res, true);
+    let json: { id?: number; number?: number; html_url?: string } | null = null;
+    try {
+      json = await res.json();
+    } catch {
+      // The write was accepted (201) but we cannot read what was created: treat as ambiguous.
+      throw new ConnectorError(
+        "verification_required",
+        "GitHub accepted the request but the response could not be read",
+        true,
+      );
+    }
+    if (typeof json?.number !== "number" || typeof json.html_url !== "string")
+      throw new ConnectorError(
+        "verification_required",
+        "GitHub accepted the request but returned an unexpected response",
+        true,
+      );
+    return { id: String(json.id ?? json.number), number: json.number, url: json.html_url };
+  }
+
+  /**
+   * Looks for an issue we previously created, identified by the hidden marker in its body. A hit is
+   * reliable proof the write happened; a miss proves nothing (listing can lag), so callers must not
+   * treat "not found" as "not created".
+   */
+  async findIssueByMarker(
+    owner: string,
+    repo: string,
+    marker: string,
+    since: Date,
+    creator: string,
+  ): Promise<{ id: string; number: number; url: string } | null> {
+    const q = new URLSearchParams({
+      state: "all",
+      creator,
+      since: since.toISOString(),
+      per_page: "50",
+      sort: "created",
+      direction: "desc",
+    });
+    const { data } = await this.json<
+      {
+        id: number;
+        number: number;
+        html_url: string;
+        body?: string | null;
+        pull_request?: unknown;
+      }[]
+    >(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues?${q}`);
+    const hit = data.find(
+      (i) => !i.pull_request && typeof i.body === "string" && i.body.includes(marker),
+    );
+    return hit ? { id: String(hit.id), number: hit.number, url: hit.html_url } : null;
+  }
 }

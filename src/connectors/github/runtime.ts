@@ -1,6 +1,7 @@
 import { ConnectorError } from "../errors";
 import type {
   ConnectorRuntime,
+  ExecutionOutcome,
   HealthStepResult,
   HealthTestResult,
   ProposalValidation,
@@ -232,12 +233,95 @@ export async function githubValidateProposal(
   }
 }
 
+/** Invisible marker that lets us find our own issue later. Disclosed to reviewers on the review screen. */
+export const issueMarker = (idempotencyKey: string) => `<!-- ai-action-inbox:${idempotencyKey} -->`;
+export const withMarker = (body: string, idempotencyKey: string) =>
+  `${body}${body ? "\n\n" : ""}${issueMarker(idempotencyKey)}`;
+
+type IssueArgs = { owner: string; repo: string; title: string; body: string; labels: string[] };
+
+/** The single GitHub write. Called only after approval, claim and re-validation. */
+export async function githubCreateIssue(
+  ctx: RuntimeContext,
+  args: Record<string, unknown>,
+  opts: { idempotencyKey: string },
+): Promise<ExecutionOutcome> {
+  const a = args as unknown as IssueArgs;
+  let token: string;
+  try {
+    token = await ctx.getAccessToken();
+  } catch (e) {
+    return {
+      status: "failed",
+      category: e instanceof ConnectorError ? e.category : "auth_expired",
+      message: "The GitHub connection needs to be reconnected.",
+    };
+  }
+  try {
+    const issue = await new GithubClient(ctx.fetch, token).createIssue(a.owner, a.repo, {
+      title: a.title,
+      body: withMarker(a.body ?? "", opts.idempotencyKey),
+      labels: a.labels ?? [],
+    });
+    return {
+      status: "succeeded",
+      providerId: String(issue.number),
+      url: issue.url,
+      details: { issueNumber: issue.number, issueId: issue.id, repository: `${a.owner}/${a.repo}` },
+    };
+  } catch (e) {
+    if (e instanceof ConnectorError) {
+      // maybeDispatched means GitHub may have created the issue: never report failure, never retry.
+      if (e.maybeDispatched) return { status: "unknown", reason: e.message };
+      return { status: "failed", category: e.category, message: e.message };
+    }
+    return { status: "unknown", reason: "Unexpected error after the request was sent" };
+  }
+}
+
+/** Positive-only lookup: finds the issue if it exists; otherwise says nothing. */
+export async function githubReconcile(
+  ctx: RuntimeContext,
+  args: Record<string, unknown>,
+  opts: { idempotencyKey: string; since: Date },
+): Promise<ExecutionOutcome | null> {
+  const a = args as unknown as IssueArgs;
+  try {
+    const gh = new GithubClient(ctx.fetch, await ctx.getAccessToken());
+    const me = await gh.getUser();
+    const hit = await gh.findIssueByMarker(
+      a.owner,
+      a.repo,
+      issueMarker(opts.idempotencyKey),
+      opts.since,
+      me.login,
+    );
+    return hit
+      ? {
+          status: "succeeded",
+          providerId: String(hit.number),
+          url: hit.url,
+          details: {
+            issueNumber: hit.number,
+            issueId: hit.id,
+            repository: `${a.owner}/${a.repo}`,
+            reconciled: true,
+          },
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export const githubRuntime: ConnectorRuntime = {
   provider: "github",
   healthTest: githubHealthTest,
   validateProposal: (ctx, _capability, args) => githubValidateProposal(ctx, args),
-  async execute() {
-    // Issue creation is implemented in P1-042.
-    throw new ConnectorError("failed_before_dispatch", "GitHub execution is not available yet");
-  },
+  execute: (ctx, _capability, args, opts) => githubCreateIssue(ctx, args, opts),
+  reconcile: (ctx, _capability, args, opts) =>
+    githubReconcile(ctx, args, {
+      idempotencyKey: opts.idempotencyKey,
+      since: (opts as { since?: Date }).since ?? new Date(Date.now() - 24 * 3600_000),
+    }),
 };

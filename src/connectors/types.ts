@@ -116,7 +116,7 @@ export type ConnectorRuntime = {
     ctx: RuntimeContext,
     capability: Capability,
     args: Record<string, unknown>,
-    opts: { idempotencyKey: string; proposalId: string },
+    opts: { idempotencyKey: string; proposalId: string; since?: Date },
   ): Promise<ExecutionOutcome | null>;
 };
 

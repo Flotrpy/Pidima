@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { getEnv } from "@/lib/env";
+import { runExecutionMaintenance } from "@/server/executor";
 import { sweepExpired } from "@/server/proposals";
 
 export const dynamic = "force-dynamic";
@@ -19,5 +20,6 @@ export async function POST(req: Request) {
   if (!isAuthorizedCron(req, getEnv().CRON_SECRET))
     return new Response("Not found", { status: 404 });
   const expired = await sweepExpired();
-  return Response.json({ expired });
+  const execution = await runExecutionMaintenance();
+  return Response.json({ expired, execution });
 }
