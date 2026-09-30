@@ -19,6 +19,13 @@ const schema = z.object({
   // Transactional email for magic links and notifications.
   SMTP_URL: optional,
   SMTP_FROM: optional,
+  // Connector OAuth apps (what Claude may propose actions for). Separate from sign-in apps.
+  CONNECTOR_GITHUB_CLIENT_ID: optional,
+  CONNECTOR_GITHUB_CLIENT_SECRET: optional,
+  CONNECTOR_SLACK_CLIENT_ID: optional,
+  CONNECTOR_SLACK_CLIENT_SECRET: optional,
+  CONNECTOR_GOOGLE_CLIENT_ID: optional,
+  CONNECTOR_GOOGLE_CLIENT_SECRET: optional,
 });
 
 export type Env = z.infer<typeof schema>;
@@ -35,6 +42,17 @@ export function getEnv(source: Record<string, string | undefined> = process.env)
   }
   if (source === process.env) cached = result.data;
   return result.data;
+}
+
+export type ConnectorProvider = "github" | "slack" | "gmail";
+
+/** Connector providers whose OAuth app is fully configured for this deployment. */
+export function configuredConnectors(env: Env): ConnectorProvider[] {
+  const out: ConnectorProvider[] = [];
+  if (env.CONNECTOR_GITHUB_CLIENT_ID && env.CONNECTOR_GITHUB_CLIENT_SECRET) out.push("github");
+  if (env.CONNECTOR_SLACK_CLIENT_ID && env.CONNECTOR_SLACK_CLIENT_SECRET) out.push("slack");
+  if (env.CONNECTOR_GOOGLE_CLIENT_ID && env.CONNECTOR_GOOGLE_CLIENT_SECRET) out.push("gmail");
+  return out;
 }
 
 export type AuthMethod = "google" | "github" | "email";

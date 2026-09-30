@@ -482,3 +482,22 @@ body:has(dialog[open]) {
 .list-row:last-child {
   border-bottom: 0;
 }
+.facts {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.facts dt {
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 520px) {
+  .facts {
+    grid-template-columns: 1fr;
+  }
+}
