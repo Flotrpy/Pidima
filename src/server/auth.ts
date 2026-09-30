@@ -29,6 +29,12 @@ function build() {
     session: {
       expiresIn: 60 * 60 * 24 * 7,
       updateAge: 60 * 60 * 24,
+      // No signed cookie cache: a revoked or deleted session must stop working immediately.
+      cookieCache: { enabled: false },
+    },
+    advanced: {
+      useSecureCookies: env.NODE_ENV === "production",
+      defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
     },
     socialProviders: {
       ...(methods.includes("google") && {

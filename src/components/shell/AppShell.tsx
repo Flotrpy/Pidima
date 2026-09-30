@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { signOutAction } from "@/app/actions/auth";
+import { Button } from "@/components/ui";
 import { MobileMenu } from "./MobileMenu";
 import { APP_NAV } from "./nav";
 
@@ -16,7 +18,14 @@ export function AppShell({ user, children }: { user: { name: string }; children:
             AI Action Inbox
           </Link>
         </div>
-        <span className="muted app-user">{user.name}</span>
+        <div className="row">
+          <span className="muted app-user">{user.name}</span>
+          <form action={signOutAction}>
+            <Button type="submit" small>
+              Sign out
+            </Button>
+          </form>
+        </div>
       </header>
       <nav aria-label="Application" className="app-sidenav desktop-only">
         <ul className="side-list">
