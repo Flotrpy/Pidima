@@ -754,3 +754,28 @@ body:has(dialog[open]) {
 .diff-del .diff-mark {
   color: var(--failure);
 }
+
+/* Decision bar: sticky at the bottom of the review, in normal flow so it never covers content. */
+.decision-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 6;
+  background: var(--surface);
+  border-top: 1px solid var(--border-strong);
+  padding: 12px 0 4px;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.decision-blockers {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--failure);
+  font-size: 0.9rem;
+}
+@media (max-width: 899px) {
+  .decision-bar {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
+  }
+}

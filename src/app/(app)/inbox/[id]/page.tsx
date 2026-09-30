@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import { DecisionBar } from "@/components/inbox/DecisionBar";
 import { canDecide } from "@/lib/permissions";
 import { loadMembership } from "@/server/authz";
 import { InboxList } from "@/components/inbox/InboxList";
@@ -30,6 +30,10 @@ export default async function ReviewPage({
     throw e;
   }
   const m = await loadMembership(user.id, workspace.id);
+  const canApprove = !!m && canDecide(m.role, m.approvalCapabilities, detail.capability as never);
+  const canWithdraw =
+    (detail.state === "PENDING_APPROVAL" || detail.state === "APPROVED") &&
+    (canApprove || detail.requestedById === user.id);
   const canEdit =
     detail.state === "PENDING_APPROVAL" &&
     !!m &&
@@ -51,13 +55,17 @@ export default async function ReviewPage({
       <div className="inbox-detail">
         <ReviewPanel
           d={detail}
-          actions={
-            canEdit ? (
-              <div className="row">
-                <Link href={`/inbox/${detail.id}/edit`} className="btn btn-sm">
-                  Edit
-                </Link>
-              </div>
+          footer={
+            detail.state === "PENDING_APPROVAL" || detail.state === "APPROVED" ? (
+              <DecisionBar
+                proposalId={detail.id}
+                version={detail.version}
+                capability={detail.capability}
+                canDecide={detail.state === "PENDING_APPROVAL" && canApprove}
+                canEdit={canEdit}
+                canCancel={canWithdraw}
+                blockers={detail.blockers}
+              />
             ) : null
           }
         />

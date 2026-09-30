@@ -9,7 +9,15 @@ import { RelativeTime } from "./RelativeTime";
 const PENDING_LIKE = new Set(["PENDING_APPROVAL"]);
 
 /** Everything a reviewer must see, in the order they need it. Nothing is hidden behind a toggle. */
-export function ReviewPanel({ d, actions }: { d: ProposalDetail; actions?: ReactNode }) {
+export function ReviewPanel({
+  d,
+  actions,
+  footer,
+}: {
+  d: ProposalDetail;
+  actions?: ReactNode;
+  footer?: ReactNode;
+}) {
   return (
     <article
       className="review stack"
@@ -156,6 +164,7 @@ export function ReviewPanel({ d, actions }: { d: ProposalDetail; actions?: React
           </ul>
         </section>
       ) : null}
+      {footer}
     </article>
   );
 }

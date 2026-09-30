@@ -195,6 +195,7 @@ export type ProposalDetail = {
   state: ProposalState;
   clientLabel: string;
   requestedBy: string | null;
+  requestedById: string | null;
   createdAt: Date;
   expiresAt: Date;
   version: number;
@@ -297,6 +298,7 @@ export async function getProposalDetail(
     state: p.state as ProposalState,
     clientLabel: p.clientLabel,
     requestedBy: row.initiator,
+    requestedById: p.initiatedByUserId,
     createdAt: p.createdAt,
     expiresAt: p.expiresAt,
     version: p.currentVersion,
