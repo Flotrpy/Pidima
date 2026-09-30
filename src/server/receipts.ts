@@ -200,6 +200,7 @@ export async function buildReceiptBody(
   const editVersions = versions.filter((v) => v.authorType === "human");
 
   const errCat = e?.errorCategory as ErrorCategory | null | undefined;
+  const display = (final.display ?? {}) as Record<string, string>;
   const result = e?.providerResult as
     { providerId?: string; url?: string | null } | null | undefined;
 
