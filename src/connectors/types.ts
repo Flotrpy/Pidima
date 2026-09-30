@@ -72,9 +72,21 @@ export type RuntimeContext = {
   fetch: SafeFetch;
 };
 
+export type RefreshableCredentials = {
+  accessToken: string;
+  refreshToken?: string;
+  tokenType?: string;
+  scope?: string;
+  extra?: Record<string, string>;
+};
+
 /** Provider I/O. Registered separately from the pure capability definitions. */
 export type ConnectorRuntime = {
   provider: Provider;
+  /** Exchanges a refresh token for new credentials. Omit for providers with non-expiring tokens. */
+  refresh?(
+    current: RefreshableCredentials,
+  ): Promise<{ credentials: RefreshableCredentials; expiresAt: Date | null }>;
   healthTest(ctx: RuntimeContext): Promise<HealthTestResult>;
   execute(
     ctx: RuntimeContext,
