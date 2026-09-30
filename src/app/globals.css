@@ -261,7 +261,8 @@ svg {
   white-space: nowrap;
 }
 .badge-pending {
-  color: var(--pending);
+  /* Darker than the spec's amber so text meets WCAG AA on the tinted background; the amber stays on borders and icons. */
+  color: #74490b;
   background: var(--pending-bg);
   border-color: rgba(183, 121, 31, 0.3);
 }
@@ -1125,5 +1126,23 @@ body:has(dialog[open]) {
   }
   .mk-hero {
     padding-top: 32px;
+  }
+}
+
+.reveal {
+  transition:
+    opacity 0.45s ease-out,
+    transform 0.45s ease-out;
+}
+.reveal[data-armed="true"]:not([data-shown="true"]) {
+  opacity: 0;
+  transform: translateY(14px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal[data-armed="true"]:not([data-shown="true"]) {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }

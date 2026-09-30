@@ -24,8 +24,14 @@ Other CI checks: `npm run typecheck`, `npm run lint`, `npm run format:check`, `n
 
 ## 2. Browser end-to-end (Playwright)
 
-Planned in P1-066: onboarding, returning-user inbox, approve/edit/deny, mobile approval, keyboard-only review,
-reduced motion and accessibility checks. Runs against a local build with fixture providers.
+`npm run e2e` (Playwright, Chromium) runs against a production build. Implemented for the **public site and sign-in**:
+axe WCAG 2.0/2.1/2.2 A and AA scans, no horizontal scroll from 320px to 1920px, 200% text zoom, skip link, mobile
+drawer focus trap/Escape/scroll lock, keyboard-only completion of the interactive demo, visible focus, reduced motion,
+landmarks and 44px touch targets.
+
+**Not yet covered in a browser:** the authenticated application (inbox, review, approve/edit/deny, mobile approval
+bar, keyboard-only review). Those flows are covered at the service level in Vitest, but a signed-in browser
+session needs seeded data and a test sign-in path that is not built yet. This is a known gap.
 
 ## 3. Live provider verification (manual, controlled test accounts)
 

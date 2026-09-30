@@ -1,20 +1,36 @@
 "use client";
 
-import { motion, useReducedMotion } from "motion/react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
-/** Small fade-and-rise on first view. Reduced motion: no movement, content is simply there. */
+/**
+ * Fade-and-rise on first view. The element never changes type and starts fully visible: the hidden
+ * starting state is only applied (via data-armed) after hydration, so without JavaScript, or with
+ * reduced motion (handled in CSS), all content is simply there.
+ */
 export function Reveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
-  const reduce = useReducedMotion();
-  if (reduce) return <div>{children}</div>;
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const rect = el.getBoundingClientRect();
+    // Already on screen at load: leave it visible instead of flashing it out and back in.
+    if (rect.top < window.innerHeight * 0.9) return;
+    el.dataset.armed = "true";
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          el.dataset.shown = "true";
+          io.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -60px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 14 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.45, delay, ease: "easeOut" }}
-    >
+    <div ref={ref} className="reveal" style={{ transitionDelay: `${delay}s` }}>
       {children}
-    </motion.div>
+    </div>
   );
 }

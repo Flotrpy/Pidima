@@ -29,6 +29,26 @@ export function MobileMenu({
     return () => d.removeEventListener("close", onClose);
   }, []);
 
+  // The native modal dialog makes the page inert, but Tab can still escape to browser UI.
+  // Wrap focus explicitly so keyboard users stay inside the drawer until they close it.
+  function trapTab(e: React.KeyboardEvent<HTMLDialogElement>) {
+    if (e.key !== "Tab") return;
+    const items = Array.from(
+      ref.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])") ?? [],
+    );
+    if (items.length === 0) return;
+    const first = items[0]!;
+    const last = items[items.length - 1]!;
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !ref.current?.contains(active))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (active === last || !ref.current?.contains(active))) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
   function show() {
     ref.current?.showModal();
     setOpen(true);
@@ -52,6 +72,7 @@ export function MobileMenu({
         ref={ref}
         className="drawer"
         aria-label="Site navigation"
+        onKeyDown={trapTab}
         onClick={(e) => e.target === ref.current && close()}
       >
         <div className="drawer-panel">

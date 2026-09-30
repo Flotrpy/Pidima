@@ -30,3 +30,9 @@ jobs:
       - run: npm run build
         env:
           BETTER_AUTH_SECRET: ci-build-secret-ci-build-secret-ci-1234
+      - run: npx playwright install --with-deps chromium
+      - run: npm run e2e
+        env:
+          CI: "true"
+          BETTER_AUTH_SECRET: ci-build-secret-ci-build-secret-ci-1234
+          CREDENTIAL_ENCRYPTION_KEY_V1: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
