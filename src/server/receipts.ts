@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, notExists, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, notExists, or, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   approvalDecisions,
@@ -416,4 +416,108 @@ export async function getReceipt(actorId: string, workspaceId: string, receiptId
     .where(and(eq(receipts.id, receiptId), eq(receipts.workspaceId, workspaceId)));
   if (!r) throw new WorkspaceError("not_found", "Receipt not found");
   return { id: r.id, kind: r.kind, createdAt: r.createdAt, body: r.body as unknown as ReceiptBody };
+}
+
+export const HISTORY_FILTERS = {
+  all: { label: "All", states: RECEIPT_STATES },
+  completed: { label: "Completed", states: ["SUCCEEDED"] as ProposalState[] },
+  failed: { label: "Failed", states: ["FAILED"] as ProposalState[] },
+  unknown: { label: "Outcome unknown", states: ["OUTCOME_UNKNOWN"] as ProposalState[] },
+  denied: { label: "Denied or canceled", states: ["DENIED", "CANCELED"] as ProposalState[] },
+  expired: { label: "Expired", states: ["EXPIRED"] as ProposalState[] },
+} as const;
+export type HistoryFilter = keyof typeof HISTORY_FILTERS;
+export const isHistoryFilter = (v: unknown): v is HistoryFilter =>
+  typeof v === "string" && Object.hasOwn(HISTORY_FILTERS, v);
+export const HISTORY_PAGE = 25;
+
+export type HistoryRow = {
+  receiptId: string;
+  proposalId: string;
+  kind: string;
+  finalState: ProposalState;
+  createdAt: Date;
+  summary: string;
+  destination: string;
+  client: string;
+  decidedBy: string | null;
+  recovery: { title: string; recovery: string } | null;
+};
+
+/**
+ * Settled items, newest first. Receipts are the record, so a correction supersedes its original:
+ * only the latest receipt per proposal is listed. Keyset-paginated; workspace-scoped.
+ */
+export async function listHistory(
+  actorId: string,
+  workspaceId: string,
+  filter: HistoryFilter = "all",
+  cursor?: string,
+) {
+  await requirePermission(actorId, workspaceId, "receipts.view");
+  let c: { t: Date; id: string } | null = null;
+  try {
+    const j = cursor ? JSON.parse(Buffer.from(cursor, "base64url").toString()) : null;
+    if (
+      j &&
+      typeof j.t === "string" &&
+      typeof j.id === "string" &&
+      /^[0-9a-f-]{36}$/i.test(j.id) &&
+      !Number.isNaN(Date.parse(j.t))
+    )
+      c = { t: new Date(j.t), id: j.id };
+  } catch {
+    c = null;
+  }
+  const db = getDb();
+  const rows = await db
+    .select()
+    .from(receipts)
+    .where(
+      and(
+        eq(receipts.workspaceId, workspaceId),
+        inArray(receipts.finalState, [...HISTORY_FILTERS[filter].states] as never),
+        // Hide originals that have a later correction.
+        notExists(
+          db
+            .select({ x: sql`1` })
+            .from(sql`receipts r2`)
+            .where(
+              sql`r2.proposal_id = ${receipts.proposalId} AND r2.created_at > ${receipts.createdAt}`,
+            ),
+        ),
+        c
+          ? or(lt(receipts.createdAt, c.t), and(eq(receipts.createdAt, c.t), lt(receipts.id, c.id)))
+          : undefined,
+      ),
+    )
+    .orderBy(desc(receipts.createdAt), desc(receipts.id))
+    .limit(HISTORY_PAGE + 1);
+  const page = rows.slice(0, HISTORY_PAGE);
+  const items: HistoryRow[] = page.map((r) => {
+    const b = r.body as unknown as ReceiptBody;
+    const err = b.execution?.error;
+    return {
+      receiptId: r.id,
+      proposalId: r.proposalId,
+      kind: r.kind,
+      finalState: r.finalState as ProposalState,
+      createdAt: r.createdAt,
+      summary: b.action.summary,
+      destination: b.action.destination,
+      client: b.client.label,
+      decidedBy: b.decision.by?.name ?? null,
+      recovery: err ? { title: err.title, recovery: err.recovery } : null,
+    };
+  });
+  const last = page.at(-1);
+  return {
+    items,
+    nextCursor:
+      rows.length > HISTORY_PAGE && last
+        ? Buffer.from(JSON.stringify({ t: last.createdAt.toISOString(), id: last.id })).toString(
+            "base64url",
+          )
+        : null,
+  };
 }

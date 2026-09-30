@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { StatusBadge } from "@/components/ui";
 import type { ProposalDetail } from "@/server/inbox";
 import { formatUtc } from "@/lib/time";
+import { ERROR_GUIDANCE, type ErrorCategory } from "@/connectors/errors";
 import { DiffView } from "./DiffView";
 import { LongText } from "./LongText";
 import { RelativeTime } from "./RelativeTime";
@@ -48,6 +49,30 @@ export function ReviewPanel({
         {actions}
       </header>
 
+      {d.state === "FAILED" || d.state === "OUTCOME_UNKNOWN" ? (
+        <section
+          className={d.state === "FAILED" ? "alert alert-error" : "alert alert-warn"}
+          aria-labelledby="recover-h"
+          role="status"
+        >
+          <h2 id="recover-h" style={{ fontSize: "1rem" }}>
+            {d.state === "OUTCOME_UNKNOWN"
+              ? ERROR_GUIDANCE.verification_required.title
+              : ((d.execution?.errorCategory &&
+                  ERROR_GUIDANCE[d.execution.errorCategory as ErrorCategory]?.title) ??
+                "It did not complete")}
+          </h2>
+          <p style={{ margin: 0 }}>
+            {d.state === "OUTCOME_UNKNOWN"
+              ? ERROR_GUIDANCE.verification_required.recovery
+              : ((d.execution?.errorCategory &&
+                  ERROR_GUIDANCE[d.execution.errorCategory as ErrorCategory]?.recovery) ??
+                "Nothing further will be attempted automatically.")}{" "}
+            The system will not retry this automatically; ask the AI to propose it again if you
+            still want it.
+          </p>
+        </section>
+      ) : null}
       {d.hiddenDirectionWarning ? (
         <p className="alert alert-warn" role="alert">
           This content contains hidden text-direction characters, which can make text display
