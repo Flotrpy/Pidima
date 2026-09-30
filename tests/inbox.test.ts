@@ -71,7 +71,7 @@ async function setup() {
 }
 
 describe("inbox listing", () => {
-  it("lists the queue newest first with destination and requester", async () => {
+  it("lists the queue with destination and requester, soonest-expiring first", async () => {
     const s = await setup();
     await s.make("first");
     await new Promise((r) => setTimeout(r, 5));
@@ -85,7 +85,7 @@ describe("inbox listing", () => {
       state: "PENDING_APPROVAL",
       title: "GitHub issue",
     });
-    expect(items[0]!.createdAt.getTime()).toBeGreaterThanOrEqual(items[1]!.createdAt.getTime());
+    expect(items[0]!.expiresAt.getTime()).toBeLessThanOrEqual(items[1]!.expiresAt.getTime());
   });
 
   it("filters by state group", async () => {
@@ -274,5 +274,74 @@ describe("operational summary", () => {
       lastVerifiedActivity: null,
       expiringSoon: 1,
     });
+  });
+});
+
+describe("prioritized queue and search", () => {
+  it("orders pending work soonest-expiring first, and history newest first", async () => {
+    const s = await setup();
+    const a = await s.make("slow");
+    const b = await s.make("urgent");
+    const c = await s.make("middle");
+    const soon = (id: string, mins: number) =>
+      getDb()
+        .update(proposals)
+        .set({ expiresAt: new Date(Date.now() + mins * 60_000) })
+        .where(eq(proposals.id, id));
+    await soon(a.proposalId, 600);
+    await soon(b.proposalId, 5);
+    await soon(c.proposalId, 60);
+    const { items } = await listProposals(s.owner, s.ws.id, "needs_review");
+    expect(items.map((i) => i.id)).toEqual([b.proposalId, c.proposalId, a.proposalId]);
+  });
+
+  it("paginates the expiry-ordered queue without repeats or gaps", async () => {
+    const s = await setup();
+    const ids: string[] = [];
+    for (let i = 0; i < PAGE_SIZE + 4; i++) ids.push((await s.make(`q${i}`)).proposalId);
+    await Promise.all(
+      ids.map((id, i) =>
+        getDb()
+          .update(proposals)
+          .set({ expiresAt: new Date(Date.now() + (i + 1) * 60_000) })
+          .where(eq(proposals.id, id)),
+      ),
+    );
+    const p1 = await listProposals(s.owner, s.ws.id, "needs_review");
+    const p2 = await listProposals(s.owner, s.ws.id, "needs_review", p1.nextCursor!);
+    expect([...p1.items, ...p2.items].map((i) => i.id)).toEqual(ids);
+    expect(p2.nextCursor).toBeNull();
+  }, 60_000);
+
+  it("searches destination, client and requester safely, scoped to the workspace", async () => {
+    const s = await setup();
+    const other = await setup();
+    await s.make("one");
+    await other.make("theirs");
+    expect(
+      (await listProposals(s.owner, s.ws.id, "needs_review", undefined, "acme/plat")).items,
+    ).toHaveLength(1);
+    expect(
+      (await listProposals(s.owner, s.ws.id, "needs_review", undefined, "claude")).items,
+    ).toHaveLength(1);
+    expect(
+      (await listProposals(s.owner, s.ws.id, "needs_review", undefined, "zzz-nothing")).items,
+    ).toHaveLength(0);
+    // Wildcard characters are literals, not patterns; injection-shaped input is harmless.
+    expect(
+      (await listProposals(s.owner, s.ws.id, "needs_review", undefined, "%")).items,
+    ).toHaveLength(0);
+    expect(
+      (
+        await listProposals(
+          s.owner,
+          s.ws.id,
+          "needs_review",
+          undefined,
+          "'; drop table proposals;--",
+        )
+      ).items,
+    ).toHaveLength(0);
+    expect((await listProposals(s.owner, s.ws.id, "needs_review")).items).toHaveLength(1);
   });
 });

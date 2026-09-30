@@ -9,15 +9,35 @@ export function InboxList({
   items,
   nextCursor,
   selectedId,
+  q,
 }: {
   filter: FilterKey;
   counts: Record<FilterKey, number>;
   items: InboxRow[];
   nextCursor: string | null;
   selectedId?: string;
+  q?: string;
 }) {
   return (
     <div className="inbox-list stack">
+      <form action="/inbox" role="search" className="row" style={{ flexWrap: "nowrap" }}>
+        <input type="hidden" name="f" value={filter} />
+        <label className="sr-only" htmlFor="inbox-q">
+          Search requests
+        </label>
+        <input
+          id="inbox-q"
+          name="q"
+          type="search"
+          className="input"
+          placeholder="Search destination, client or person"
+          defaultValue={q}
+          maxLength={80}
+        />
+        <button type="submit" className="btn">
+          Search
+        </button>
+      </form>
       <nav aria-label="Inbox filters">
         <ul className="filters plain-list">
           {(Object.keys(FILTERS) as FilterKey[]).map((k) => (
@@ -54,7 +74,16 @@ export function InboxList({
                   style={{ justifyContent: "space-between", flexWrap: "nowrap" }}
                 >
                   <strong>{r.title}</strong>
-                  <StatusBadge state={r.state} />
+                  <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
+                    {r.state === "PENDING_APPROVAL" &&
+                    r.expiresAt.getTime() - Date.now() < 15 * 60_000 ? (
+                      <span className="badge badge-failure">
+                        <span aria-hidden="true">⏱</span>
+                        <span>Expiring soon</span>
+                      </span>
+                    ) : null}
+                    <StatusBadge state={r.state} />
+                  </span>
                 </div>
                 <div className="queue-dest mono">{r.destination}</div>
                 <div className="muted queue-meta">
@@ -74,7 +103,10 @@ export function InboxList({
         </ul>
       )}
       {nextCursor ? (
-        <Link href={`/inbox?f=${filter}&cursor=${nextCursor}`} className="btn btn-sm">
+        <Link
+          href={`/inbox?f=${filter}&cursor=${nextCursor}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+          className="btn btn-sm"
+        >
           Load older
         </Link>
       ) : null}

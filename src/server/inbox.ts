@@ -1,5 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   approvalDecisions,
@@ -71,10 +71,16 @@ export async function listProposals(
   workspaceId: string,
   filter: FilterKey,
   cursor?: string,
+  q?: string,
 ) {
   await requirePermission(actorId, workspaceId, "proposals.view");
   const db = getDb();
   const c = decodeCursor(cursor);
+  // Work that needs a person is ordered by urgency (soonest expiry first); history is newest first.
+  const byExpiry = filter === "needs_review";
+  const sortCol = byExpiry ? proposals.expiresAt : proposals.createdAt;
+  const term = q?.trim().slice(0, 80);
+  const like = term ? `%${term.replace(/[\\%_]/g, (m) => `\\${m}`)}%` : null;
   const rows = await db
     .select({ p: proposals, v: proposalVersions, initiator: users.name })
     .from(proposals)
@@ -91,14 +97,23 @@ export async function listProposals(
         eq(proposals.workspaceId, workspaceId),
         inArray(proposals.state, [...FILTERS[filter].states]),
         c
+          ? byExpiry
+            ? or(gt(sortCol, c.t), and(eq(sortCol, c.t), gt(proposals.id, c.id)))
+            : or(lt(sortCol, c.t), and(eq(sortCol, c.t), lt(proposals.id, c.id)))
+          : undefined,
+        like
           ? or(
-              lt(proposals.createdAt, c.t),
-              and(eq(proposals.createdAt, c.t), lt(proposals.id, c.id)),
+              ilike(proposalVersions.destination, like),
+              ilike(proposals.clientLabel, like),
+              ilike(users.name, like),
+              ilike(sql`${proposals.capability}::text`, like),
             )
           : undefined,
       ),
     )
-    .orderBy(desc(proposals.createdAt), desc(proposals.id))
+    .orderBy(
+      ...(byExpiry ? [asc(sortCol), asc(proposals.id)] : [desc(sortCol), desc(proposals.id)]),
+    )
     .limit(PAGE_SIZE + 1);
 
   const page = rows.slice(0, PAGE_SIZE);
@@ -116,7 +131,10 @@ export async function listProposals(
   const last = page.at(-1);
   return {
     items,
-    nextCursor: rows.length > PAGE_SIZE && last ? encodeCursor(last.p.createdAt, last.p.id) : null,
+    nextCursor:
+      rows.length > PAGE_SIZE && last
+        ? encodeCursor(byExpiry ? last.p.expiresAt : last.p.createdAt, last.p.id)
+        : null,
   };
 }
 

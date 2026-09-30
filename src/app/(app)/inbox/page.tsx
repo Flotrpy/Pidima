@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function InboxPage({
   searchParams,
 }: {
-  searchParams: Promise<{ f?: string; cursor?: string; invite_error?: string }>;
+  searchParams: Promise<{ f?: string; cursor?: string; q?: string; invite_error?: string }>;
 }) {
   const { user, workspace, role } = await requireActiveContext();
   const sp = await searchParams;
@@ -34,7 +34,7 @@ export default async function InboxPage({
   const [summary, counts, { items, nextCursor }] = await Promise.all([
     getOperationalSummary(user.id, workspace.id),
     countsByFilter(user.id, workspace.id),
-    listProposals(user.id, workspace.id, filter, sp.cursor),
+    listProposals(user.id, workspace.id, filter, sp.cursor, sp.q),
   ]);
   return (
     <div className="stack" style={{ ["--gap" as string]: "20px" }}>
@@ -46,7 +46,7 @@ export default async function InboxPage({
       ) : null}
       <SummaryStrip s={summary} />
       <div className="inbox-grid">
-        <InboxList filter={filter} counts={counts} items={items} nextCursor={nextCursor} />
+        <InboxList filter={filter} counts={counts} items={items} nextCursor={nextCursor} q={sp.q} />
         <div className="inbox-detail inbox-detail-empty muted">
           Select a request to review the exact action.
         </div>
