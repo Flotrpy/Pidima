@@ -21,8 +21,9 @@ describe("proposal state machine", () => {
     expect(nextState("EXECUTING", "mark_unknown")).toBe("OUTCOME_UNKNOWN");
   });
 
-  it("supports edit, deny, cancel and timeout from pending", () => {
-    expect(nextState("PENDING_APPROVAL", "edit")).toBe("SUPERSEDED");
+  it("supports edit (new version), deny, cancel and timeout from pending", () => {
+    // An edit appends a new version; the proposal itself stays pending.
+    expect(nextState("PENDING_APPROVAL", "edit")).toBe("PENDING_APPROVAL");
     expect(nextState("PENDING_APPROVAL", "deny")).toBe("DENIED");
     expect(nextState("PENDING_APPROVAL", "cancel")).toBe("CANCELED");
     expect(nextState("PENDING_APPROVAL", "expire")).toBe("EXPIRED");
@@ -49,6 +50,11 @@ describe("proposal state machine", () => {
       for (const e of ALL_EVENTS) expect(canTransition(s, e)).toBe(false);
     }
     expect(isTerminal("OUTCOME_UNKNOWN")).toBe(false);
+  });
+
+  it("never edits anything that is no longer pending", () => {
+    for (const s of ALL_STATES.filter((s) => s !== "PENDING_APPROVAL"))
+      expect(canTransition(s, "edit")).toBe(false);
   });
 
   it("cannot execute anything that has not been approved, and cannot cancel once executing", () => {

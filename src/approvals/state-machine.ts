@@ -18,7 +18,8 @@ export type ProposalEvent =
  * The complete, server-enforced transition table. Anything not listed is illegal.
  *
  *   DRAFT ─submit→ PENDING_APPROVAL ─approve→ APPROVED ─claim→ EXECUTING ─succeed→ SUCCEEDED
- *                       │ edit→ SUPERSEDED         │ fail (pre-dispatch check failed) → FAILED
+ *                       │ edit→ PENDING_APPROVAL (new version; old version SUPERSEDED)
+ *                       │                          │ fail (pre-dispatch check failed) → FAILED
  *                       │ deny→ DENIED             │ cancel/expire
  *                       │ cancel→ CANCELED         └─ EXECUTING ─fail→ FAILED
  *                       └ expire→ EXPIRED                       └mark_unknown→ OUTCOME_UNKNOWN ─reconcile→ SUCCEEDED | FAILED
@@ -27,7 +28,9 @@ const TABLE: Record<ProposalState, Partial<Record<ProposalEvent, ProposalState>>
   DRAFT: { submit: "PENDING_APPROVAL", cancel: "CANCELED" },
   PENDING_APPROVAL: {
     approve: "APPROVED",
-    edit: "SUPERSEDED",
+    // `edit` keeps the proposal pending: it appends a new immutable version and the previous
+    // version becomes SUPERSEDED (a per-version status derived from the version number).
+    edit: "PENDING_APPROVAL",
     deny: "DENIED",
     cancel: "CANCELED",
     expire: "EXPIRED",
