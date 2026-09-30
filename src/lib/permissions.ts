@@ -67,6 +67,7 @@ export function canDecide(
 export const NAV_PERMISSION: Record<string, Permission> = {
   "/inbox": "proposals.view",
   "/history": "receipts.view",
+  "/activity": "activity.view",
   "/connections": "connectors.manage",
   "/clients": "clients.connect",
   "/policies": "policies.manage",

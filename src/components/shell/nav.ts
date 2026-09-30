@@ -9,6 +9,7 @@ export const PUBLIC_NAV = [
 export const APP_NAV = [
   { href: "/inbox", label: "Inbox" },
   { href: "/history", label: "History" },
+  { href: "/activity", label: "Activity" },
   { href: "/connections", label: "Connections" },
   { href: "/clients", label: "AI Clients" },
   { href: "/policies", label: "Policies" },

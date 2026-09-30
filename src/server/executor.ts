@@ -9,6 +9,7 @@ import type { ExecutionOutcome } from "@/connectors/types";
 import { hostname } from "node:os";
 import { onProposalApproved } from "./decisions";
 import { notifyExecutionOutcome } from "./notifications";
+import { purgeExpiredAuditEvents } from "./activity";
 import { backfillMissingReceipts } from "./receipts";
 import {
   claimExecution,
@@ -242,5 +243,8 @@ export async function runExecutionMaintenance() {
   }
   const reconciled = await reconcileUnknownOutcomes();
   const receipts = await backfillMissingReceipts();
-  return { recovered, dispatched, reconciled, receipts };
+  const auditPurged = await purgeExpiredAuditEvents(
+    Number(process.env.AUDIT_RETENTION_DAYS) || undefined,
+  ).catch(() => 0);
+  return { recovered, dispatched, reconciled, receipts, auditPurged };
 }

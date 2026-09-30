@@ -20,6 +20,7 @@ import { getCapability } from "@/connectors/registry";
 import type { ProposalState } from "@/components/ui/status";
 import type { Executor } from "./audit";
 import { requirePermission } from "./authz";
+import { decodeKeyset, encodeKeyset, tsEq, tsLt, tsText } from "./keyset";
 import { WorkspaceError } from "./workspaces";
 
 /** States that settle a proposal for the user. Receipts are created for each. */
@@ -455,23 +456,10 @@ export async function listHistory(
   cursor?: string,
 ) {
   await requirePermission(actorId, workspaceId, "receipts.view");
-  let c: { t: Date; id: string } | null = null;
-  try {
-    const j = cursor ? JSON.parse(Buffer.from(cursor, "base64url").toString()) : null;
-    if (
-      j &&
-      typeof j.t === "string" &&
-      typeof j.id === "string" &&
-      /^[0-9a-f-]{36}$/i.test(j.id) &&
-      !Number.isNaN(Date.parse(j.t))
-    )
-      c = { t: new Date(j.t), id: j.id };
-  } catch {
-    c = null;
-  }
+  const c = decodeKeyset(cursor);
   const db = getDb();
   const rows = await db
-    .select()
+    .select({ r: receipts, ts: tsText(receipts.createdAt) })
     .from(receipts)
     .where(
       and(
@@ -487,14 +475,17 @@ export async function listHistory(
             ),
         ),
         c
-          ? or(lt(receipts.createdAt, c.t), and(eq(receipts.createdAt, c.t), lt(receipts.id, c.id)))
+          ? or(
+              tsLt(receipts.createdAt, c.t),
+              and(tsEq(receipts.createdAt, c.t), lt(receipts.id, c.id)),
+            )
           : undefined,
       ),
     )
     .orderBy(desc(receipts.createdAt), desc(receipts.id))
     .limit(HISTORY_PAGE + 1);
   const page = rows.slice(0, HISTORY_PAGE);
-  const items: HistoryRow[] = page.map((r) => {
+  const items: HistoryRow[] = page.map(({ r }) => {
     const b = r.body as unknown as ReceiptBody;
     const err = b.execution?.error;
     return {
@@ -513,12 +504,7 @@ export async function listHistory(
   const last = page.at(-1);
   return {
     items,
-    nextCursor:
-      rows.length > HISTORY_PAGE && last
-        ? Buffer.from(JSON.stringify({ t: last.createdAt.toISOString(), id: last.id })).toString(
-            "base64url",
-          )
-        : null,
+    nextCursor: rows.length > HISTORY_PAGE && last ? encodeKeyset(last.ts, last.r.id) : null,
   };
 }
 

@@ -14,6 +14,7 @@ import type { ProposalState } from "@/components/ui/status";
 import type { ReviewField } from "@/connectors/types";
 import { hasHiddenDirectionControls } from "@/lib/time";
 import { requirePermission } from "./authz";
+import { decodeKeyset, encodeKeyset, tsEq, tsGt, tsLt, tsText } from "./keyset";
 import { identityNote, listConnectors } from "./connectors";
 import { evaluateForProposal } from "./policy";
 import { expireIfDue } from "./proposals";
@@ -50,23 +51,6 @@ export type InboxRow = {
   urgent: boolean;
 };
 
-const encodeCursor = (createdAt: Date, id: string) =>
-  Buffer.from(JSON.stringify({ t: createdAt.toISOString(), id })).toString("base64url");
-function decodeCursor(c: string | undefined): { t: Date; id: string } | null {
-  if (!c) return null;
-  try {
-    const { t, id } = JSON.parse(Buffer.from(c, "base64url").toString());
-    return typeof t === "string" &&
-      typeof id === "string" &&
-      isUuid(id) &&
-      !Number.isNaN(Date.parse(t))
-      ? { t: new Date(t), id }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 /** Keyset-paginated queue. Only the requested workspace's rows are ever selectable. */
 export async function listProposals(
   actorId: string,
@@ -77,14 +61,14 @@ export async function listProposals(
 ) {
   await requirePermission(actorId, workspaceId, "proposals.view");
   const db = getDb();
-  const c = decodeCursor(cursor);
+  const c = decodeKeyset(cursor);
   // Work that needs a person is ordered by urgency (soonest expiry first); history is newest first.
   const byExpiry = filter === "needs_review";
   const sortCol = byExpiry ? proposals.expiresAt : proposals.createdAt;
   const term = q?.trim().slice(0, 80);
   const like = term ? `%${term.replace(/[\\%_]/g, (m) => `\\${m}`)}%` : null;
   const rows = await db
-    .select({ p: proposals, v: proposalVersions, initiator: users.name })
+    .select({ p: proposals, v: proposalVersions, initiator: users.name, ts: tsText(sortCol) })
     .from(proposals)
     .innerJoin(
       proposalVersions,
@@ -100,8 +84,8 @@ export async function listProposals(
         inArray(proposals.state, [...FILTERS[filter].states]),
         c
           ? byExpiry
-            ? or(gt(sortCol, c.t), and(eq(sortCol, c.t), gt(proposals.id, c.id)))
-            : or(lt(sortCol, c.t), and(eq(sortCol, c.t), lt(proposals.id, c.id)))
+            ? or(tsGt(sortCol, c.t), and(tsEq(sortCol, c.t), gt(proposals.id, c.id)))
+            : or(tsLt(sortCol, c.t), and(tsEq(sortCol, c.t), lt(proposals.id, c.id)))
           : undefined,
         like
           ? or(
@@ -134,10 +118,7 @@ export async function listProposals(
   const last = page.at(-1);
   return {
     items,
-    nextCursor:
-      rows.length > PAGE_SIZE && last
-        ? encodeCursor(byExpiry ? last.p.expiresAt : last.p.createdAt, last.p.id)
-        : null,
+    nextCursor: rows.length > PAGE_SIZE && last ? encodeKeyset(last.ts, last.p.id) : null,
   };
 }
 
