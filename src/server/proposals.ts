@@ -9,11 +9,13 @@ import { getEnv } from "@/lib/env";
 import type { Capability } from "@/lib/permissions";
 import { recordAudit } from "./audit";
 import { evaluateForPropose } from "./policy";
+import { RateLimitError, consume } from "./rate-limit";
 import { resolveWithProvider, validateWithProvider } from "./proposal-validation";
 import { applyTransition } from "./transitions";
 import { getLatestArgs, insertVersion } from "./versions";
 
 export type ProposalErrorCode =
+  | "rate_limited"
   | "destination_invalid"
   | "invalid_arguments"
   | "policy_denied"
@@ -124,6 +126,11 @@ export async function createProposal(input: {
 }): Promise<CreatedProposal> {
   const def = getCapability(input.capability);
   if (!def) throw new ProposalError("unknown_capability", "Unknown capability.");
+  await consume("propose", input.principal.grantId).catch((e) => {
+    if (e instanceof RateLimitError)
+      throw new ProposalError("rate_limited", e.message, { retryAfterSec: e.retryAfterSec });
+    throw e;
+  });
   const db = getDb();
   const { principal } = input;
 

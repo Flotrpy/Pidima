@@ -8,6 +8,7 @@ import type { McpPrincipal } from "@/mcp/server";
 import { isUuid } from "./inbox";
 import { logEvent } from "./log";
 import { verifyGrantForCall } from "./mcp-grant";
+import { RateLimitError, consume } from "./rate-limit";
 import { expireIfDue, reviewUrl } from "./proposals";
 import type { ToolResult } from "./mcp-tools";
 
@@ -93,6 +94,16 @@ export async function getStatusTool(
 ): Promise<ToolResult> {
   const g = await verifyGrantForCall(principal, "proposals:read", authClientId);
   if (!g.ok) return fail(g.text);
+  const limited = await consume("status", g.v.grant.id).then(
+    () => null,
+    (e) =>
+      e instanceof RateLimitError
+        ? fail(
+            `${e.message} Status does not change faster than a person can decide; poll less often.`,
+          )
+        : Promise.reject(e),
+  );
+  if (limited) return limited;
   const id = typeof input.proposal_id === "string" ? input.proposal_id : "";
   // Same answer for malformed, missing, and not-yours.
   const notFound = fail("No proposal with that ID was found for this client.");
@@ -192,6 +203,11 @@ export async function listRecentTool(
 ): Promise<ToolResult> {
   const g = await verifyGrantForCall(principal, "proposals:read", authClientId);
   if (!g.ok) return fail(g.text);
+  const limited = await consume("status", g.v.grant.id).then(
+    () => null,
+    (e) => (e instanceof RateLimitError ? fail(e.message) : Promise.reject(e)),
+  );
+  if (limited) return limited;
   const limit = Math.min(
     20,
     Math.max(1, Number.isInteger(input.limit) ? (input.limit as number) : 10),

@@ -10,6 +10,7 @@ import { hostname } from "node:os";
 import { onProposalApproved } from "./decisions";
 import { notifyExecutionOutcome } from "./notifications";
 import { purgeExpiredAuditEvents } from "./activity";
+import { purgeOldBuckets } from "./rate-limit";
 import { backfillMissingReceipts } from "./receipts";
 import {
   claimExecution,
@@ -246,5 +247,6 @@ export async function runExecutionMaintenance() {
   const auditPurged = await purgeExpiredAuditEvents(
     Number(process.env.AUDIT_RETENTION_DAYS) || undefined,
   ).catch(() => 0);
-  return { recovered, dispatched, reconciled, receipts, auditPurged };
+  const bucketsPurged = await purgeOldBuckets().catch(() => 0);
+  return { recovered, dispatched, reconciled, receipts, auditPurged, bucketsPurged };
 }

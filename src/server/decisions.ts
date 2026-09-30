@@ -8,13 +8,20 @@ import { recordAudit } from "./audit";
 import { loadMembership } from "./authz";
 import { evaluateForProposal } from "./policy";
 import { expireIfDue } from "./proposals";
+import { RateLimitError, consume } from "./rate-limit";
 import { applyTransition } from "./transitions";
 import { IntegrityError, assertVersionIntegrity, getVersion } from "./versions";
 
 export class DecisionError extends Error {
   constructor(
     public code:
-      "not_found" | "forbidden" | "not_pending" | "conflict" | "policy_denied" | "integrity",
+      | "rate_limited"
+      | "not_found"
+      | "forbidden"
+      | "not_pending"
+      | "conflict"
+      | "policy_denied"
+      | "integrity",
     message: string,
     public details: Record<string, unknown> = {},
   ) {
@@ -68,6 +75,10 @@ type Input = {
 export async function decideProposal(input: Input): Promise<DecisionResult> {
   const m = await loadMembership(input.actorId, input.workspaceId);
   if (!m) throw new DecisionError("not_found", "Proposal not found");
+  await consume("decide", input.actorId).catch((e) => {
+    if (e instanceof RateLimitError) throw new DecisionError("rate_limited", e.message);
+    throw e;
+  });
   await expireIfDue(input.proposalId);
 
   const [p0] = await getDb()
