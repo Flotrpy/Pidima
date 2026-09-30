@@ -3,12 +3,14 @@ import { ConnectorError } from "../errors";
 import { safeFetchFor } from "../transport";
 import type {
   ConnectorRuntime,
+  ExecutionOutcome,
   HealthStepResult,
   HealthTestResult,
   ProposalValidation,
   RuntimeContext,
 } from "../types";
-import { SEND_SCOPE } from "./api";
+import { GMAIL_API, SEND_SCOPE, gmailHeaders, googleError } from "./api";
+import { buildMime, messageIdFor } from "./mime";
 import { fetchGrantedScopes, fetchIdentity, refreshAccessToken } from "./oauth";
 
 const step = (
@@ -182,14 +184,100 @@ export function gmailValidateProposal(
   return { status: "ok", display: { from: ctx.account.displayName } };
 }
 
+type MailArgs = {
+  from: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  subject: string;
+  textBody?: string;
+  htmlBody?: string;
+};
+
+/** The single email write. "Accepted by Gmail" is all it can claim: never delivery, never read. */
+export async function gmailSend(
+  ctx: RuntimeContext,
+  args: Record<string, unknown>,
+  opts: { idempotencyKey: string },
+): Promise<ExecutionOutcome> {
+  const a = args as unknown as MailArgs;
+  let token: string;
+  try {
+    token = await ctx.getAccessToken();
+  } catch (e) {
+    return {
+      status: "failed",
+      category: e instanceof ConnectorError ? e.category : "auth_expired",
+      message: "The Google connection needs to be reconnected.",
+    };
+  }
+  let raw: string;
+  try {
+    raw = Buffer.from(
+      buildMime({
+        ...a,
+        cc: a.cc ?? [],
+        bcc: a.bcc ?? [],
+        messageId: messageIdFor(opts.idempotencyKey, a.from),
+      }),
+      "utf8",
+    ).toString("base64url");
+  } catch {
+    return {
+      status: "failed",
+      category: "failed_before_dispatch",
+      message: "The message could not be built safely. Nothing was sent.",
+    };
+  }
+  try {
+    const res = await ctx.fetch(`${GMAIL_API}/users/me/messages/send`, {
+      method: "POST",
+      headers: gmailHeaders(token, true),
+      body: JSON.stringify({ raw }),
+    });
+    const j = (await res.json().catch(() => null)) as {
+      id?: string;
+      threadId?: string;
+      error?: unknown;
+    } | null;
+    if (!res.ok) {
+      const e = googleError(res.status, j as never, true);
+      return e.maybeDispatched
+        ? { status: "unknown", reason: e.message }
+        : { status: "failed", category: e.category, message: e.message };
+    }
+    if (typeof j?.id !== "string")
+      return {
+        status: "unknown",
+        reason: "Google accepted the request but returned an unexpected response.",
+      };
+    const all = new Set([...a.to, ...(a.cc ?? []), ...(a.bcc ?? [])]);
+    return {
+      status: "succeeded",
+      providerId: j.id,
+      details: {
+        messageId: j.id,
+        threadId: j.threadId ?? null,
+        recipientCount: all.size,
+        acceptedByProvider: true,
+      },
+    };
+  } catch (e) {
+    if (e instanceof ConnectorError)
+      return e.maybeDispatched
+        ? { status: "unknown", reason: e.message }
+        : { status: "failed", category: e.category, message: e.message };
+    return { status: "unknown", reason: "Unexpected error after the request was sent" };
+  }
+}
+
 export const gmailRuntime: ConnectorRuntime = {
   provider: "gmail",
   healthTest: gmailHealthTest,
   validateProposal: async (ctx, _c, args) => gmailValidateProposal(ctx, args),
-  async execute() {
-    // Sending is implemented in P1-056.
-    throw new ConnectorError("failed_before_dispatch", "Email sending is not available yet");
-  },
+  execute: (ctx, _capability, args, opts) => gmailSend(ctx, args, opts),
+  // No `reconcile`: finding a sent message needs read scopes we deliberately do not request.
+  // An ambiguous send stays OUTCOME_UNKNOWN until a person checks the Sent folder.
   async refresh(current) {
     const e = getEnv();
     if (!e.CONNECTOR_GOOGLE_CLIENT_ID || !e.CONNECTOR_GOOGLE_CLIENT_SECRET || !current.refreshToken)
