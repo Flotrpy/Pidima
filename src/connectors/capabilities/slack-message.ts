@@ -54,8 +54,12 @@ export const slackMessage: CapabilityDefinition<SlackMessageArgs> = {
     "Channel members will see it and may be notified. Slack messages can be deleted, but not before people have seen them.",
   ],
   safeSummary: (a) => `Send Slack message to ${a.channel}`,
-  receiptFacts: (a) => [
-    { label: "Channel", value: a.channel },
+  receiptFacts: (a, display) => [
+    {
+      label: "Channel",
+      value: display?.channelName ? `${display.channelName} (${a.channel})` : a.channel,
+    },
+    ...(display?.workspace ? [{ label: "Slack workspace", value: display.workspace }] : []),
     ...(a.threadTs ? [{ label: "Thread", value: a.threadTs }] : []),
     { label: "Message length", value: `${a.text.length} characters` },
   ],

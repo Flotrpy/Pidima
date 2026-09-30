@@ -71,7 +71,12 @@ export type ReceiptBody = {
     startedAt: string;
     finishedAt: string | null;
     attempts: number;
-    result: { providerId: string | null; url: string | null } | null;
+    result: {
+      providerId: string | null;
+      url: string | null;
+      /** Whitelisted, non-sensitive provider facts (issue number, channel, message timestamp, how it was sent). */
+      details: Record<string, string | number | boolean | null>;
+    } | null;
     error:
       | { category: string; title: string; recovery: string }
       | { category: "verification_required"; title: string; recovery: string }
@@ -82,6 +87,28 @@ export type ReceiptBody = {
 
 export const receiptNumber = (id: string) => `RCPT-${id.slice(0, 8).toUpperCase()}`;
 const MAX_DIFF_BYTES = 50_000;
+/** Provider result fields that may appear on a receipt. Anything else (tokens, bodies) is dropped. */
+const RESULT_DETAIL_KEYS = [
+  "issueNumber",
+  "repository",
+  "channel",
+  "messageTs",
+  "threadTs",
+  "sentAs",
+  "reconciled",
+] as const;
+
+function safeDetails(
+  result: Record<string, unknown> | null | undefined,
+): Record<string, string | number | boolean | null> {
+  const out: Record<string, string | number | boolean | null> = {};
+  for (const k of RESULT_DETAIL_KEYS) {
+    const v = result?.[k];
+    if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean")
+      out[k] = typeof v === "string" ? v.slice(0, 200) : v;
+  }
+  return out;
+}
 
 const person = (id: string | null, names: Map<string, string>): Person =>
   id ? { id, name: names.get(id) ?? "Unknown user" } : null;
@@ -224,7 +251,7 @@ export async function buildReceiptBody(
     action: {
       destination: final.destination,
       summary: def.safeSummary(final.args as never),
-      facts: def.receiptFacts(final.args as never),
+      facts: def.receiptFacts(final.args as never, display),
     },
     execution: e
       ? {
@@ -234,7 +261,11 @@ export async function buildReceiptBody(
           attempts,
           result:
             e.state === "SUCCEEDED"
-              ? { providerId: result?.providerId ?? null, url: result?.url ?? null }
+              ? {
+                  providerId: result?.providerId ?? null,
+                  url: result?.url ?? null,
+                  details: safeDetails(result as Record<string, unknown> | null),
+                }
               : null,
           error:
             errCat && errCat in ERROR_GUIDANCE
