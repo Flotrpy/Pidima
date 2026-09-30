@@ -501,3 +501,215 @@ body:has(dialog[open]) {
     grid-template-columns: 1fr;
   }
 }
+
+/* Inbox */
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.summary-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  min-height: 44px;
+}
+.summary-n {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+.summary-pending {
+  border-color: rgba(183, 121, 31, 0.4);
+  background: var(--pending-bg);
+}
+.summary-failure {
+  border-color: rgba(180, 35, 24, 0.4);
+  background: var(--failure-bg);
+}
+.summary-unknown {
+  border-color: rgba(124, 58, 237, 0.4);
+  background: var(--unknown-bg);
+}
+.summary-foot {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+.inbox-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.inbox-detail-empty {
+  display: none;
+  padding: 32px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.inbox-grid-detail .inbox-list {
+  display: none;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+.filter[aria-current="page"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.filter-count {
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+.queue {
+  display: grid;
+  gap: 8px;
+}
+.queue-row {
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+.queue-row:hover {
+  border-color: var(--border-strong);
+}
+.queue-row[aria-current="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.queue-dest {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.queue-meta {
+  font-size: 0.85rem;
+}
+.review {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  min-width: 0;
+}
+.review-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--surface);
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+}
+.review-dest {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border-left: 4px solid var(--accent);
+}
+.review-dest-value {
+  font-size: 1.05rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.review-fields {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+.review-field dt {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.review-field dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.review-field-emph dd {
+  font-size: 1.02rem;
+  font-weight: 600;
+}
+.isolate {
+  unicode-bidi: isolate;
+}
+.longtext {
+  margin: 0 0 8px;
+  padding: 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+.longtext-full {
+  max-height: none;
+}
+.fullview {
+  width: min(900px, 96vw);
+  max-height: 90dvh;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+}
+.fullview::backdrop {
+  background: rgba(15, 23, 42, 0.45);
+}
+.fullview-panel {
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+  max-height: 90dvh;
+  overflow: auto;
+}
+@media (min-width: 900px) {
+  .inbox-grid {
+    grid-template-columns: minmax(320px, 400px) 1fr;
+  }
+  .inbox-detail-empty {
+    display: block;
+  }
+  .inbox-grid-detail .inbox-list {
+    display: grid;
+  }
+  .inbox-detail {
+    position: sticky;
+    top: 16px;
+    max-height: calc(100dvh - 96px);
+    overflow: auto;
+  }
+}
