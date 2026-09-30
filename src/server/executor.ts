@@ -18,6 +18,7 @@ import {
   type Claim,
 } from "./execution-claim";
 import { runtimeContextFor } from "./connectors";
+import { reportAuthFailure } from "./credentials";
 import { reconcileToSuccess, versionOf } from "./reconcile-support";
 import { logEvent } from "./log";
 import { evaluateForProposal } from "./policy";
@@ -61,6 +62,9 @@ export async function executeApprovedProposal(
   const started = Date.now();
   const outcome = await runClaim(claim);
   await finalizeExecution(claim, outcome);
+  // A definitive "your token is dead" answer must be visible in the UI, not just on this proposal.
+  if (outcome.status === "failed" && outcome.category === "auth_expired")
+    await reportAuthFailure(claim.proposal.connectorAccountId);
   logEvent("execution.finished", {
     workspaceId: claim.proposal.workspaceId,
     proposalId: claim.proposal.id,

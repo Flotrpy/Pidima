@@ -1,4 +1,6 @@
+import { getEnv } from "@/lib/env";
 import { ConnectorError } from "../errors";
+import { safeFetchFor } from "../transport";
 import type {
   ConnectorRuntime,
   ExecutionOutcome,
@@ -8,6 +10,7 @@ import type {
   RuntimeContext,
 } from "../types";
 import { GithubClient } from "./client";
+import { refreshAccessToken } from "./oauth";
 
 const step = (
   id: HealthStepResult["id"],
@@ -317,6 +320,29 @@ export async function githubReconcile(
 export const githubRuntime: ConnectorRuntime = {
   provider: "github",
   healthTest: githubHealthTest,
+  // Only relevant when GitHub issues expiring tokens (opt-in for OAuth apps, default for GitHub Apps).
+  async refresh(current) {
+    const env = getEnv();
+    if (
+      !env.CONNECTOR_GITHUB_CLIENT_ID ||
+      !env.CONNECTOR_GITHUB_CLIENT_SECRET ||
+      !current.refreshToken
+    )
+      throw new ConnectorError("auth_expired", "Cannot refresh the GitHub token");
+    const r = await refreshAccessToken(safeFetchFor("github"), {
+      clientId: env.CONNECTOR_GITHUB_CLIENT_ID,
+      clientSecret: env.CONNECTOR_GITHUB_CLIENT_SECRET,
+      refreshToken: current.refreshToken,
+    });
+    return {
+      credentials: {
+        ...current,
+        accessToken: r.accessToken,
+        refreshToken: r.refreshToken ?? current.refreshToken,
+      },
+      expiresAt: r.expiresIn ? new Date(Date.now() + r.expiresIn * 1000) : null,
+    };
+  },
   validateProposal: (ctx, _capability, args) => githubValidateProposal(ctx, args),
   execute: (ctx, _capability, args, opts) => githubCreateIssue(ctx, args, opts),
   reconcile: (ctx, _capability, args, opts) =>

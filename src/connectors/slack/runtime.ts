@@ -1,12 +1,16 @@
+import { getEnv } from "@/lib/env";
 import { ConnectorError } from "../errors";
+import { safeFetchFor } from "../transport";
 import type {
   ConnectorRuntime,
+  ExecutionOutcome,
   HealthStepResult,
   HealthTestResult,
   ProposalValidation,
   RuntimeContext,
 } from "../types";
 import { SlackClient } from "./client";
+import { refreshAccessToken } from "./oauth";
 
 const step = (
   id: HealthStepResult["id"],
@@ -293,13 +297,77 @@ export async function slackValidateProposal(
   }
 }
 
+type MessageArgs = { channel: string; text: string; threadTs?: string };
+
+/** The single Slack write. Called only after approval, claim and re-validation. */
+export async function slackPostMessage(
+  ctx: RuntimeContext,
+  args: Record<string, unknown>,
+): Promise<ExecutionOutcome> {
+  const a = args as unknown as MessageArgs;
+  let token: string;
+  try {
+    token = await ctx.getAccessToken();
+  } catch (e) {
+    return {
+      status: "failed",
+      category: e instanceof ConnectorError ? e.category : "auth_expired",
+      message: "The Slack connection needs to be reconnected.",
+    };
+  }
+  const client = new SlackClient(ctx.fetch, token);
+  try {
+    const posted = await client.postMessage(a.channel, a.text, a.threadTs);
+    const url = await client.getPermalink(posted.channel, posted.ts);
+    const mode = ctx.account.metadata.senderMode === "user" ? "user" : "bot";
+    return {
+      status: "succeeded",
+      providerId: posted.ts,
+      url: url ?? undefined,
+      details: {
+        channel: posted.channel,
+        messageTs: posted.ts,
+        threadTs: a.threadTs ?? null,
+        sentAs: mode === "user" ? "person" : "app",
+      },
+    };
+  } catch (e) {
+    if (e instanceof ConnectorError) {
+      if (e.maybeDispatched) return { status: "unknown", reason: e.message };
+      return { status: "failed", category: e.category, message: e.message };
+    }
+    return { status: "unknown", reason: "Unexpected error after the request was sent" };
+  }
+}
+
 export const slackRuntime: ConnectorRuntime = {
   provider: "slack",
   healthTest: slackHealthTest,
   resolveArgs: (ctx, _capability, args) => slackResolveArgs(ctx, args),
   validateProposal: (ctx, _capability, args) => slackValidateProposal(ctx, args),
-  async execute() {
-    // Message sending is implemented in P1-049.
-    throw new ConnectorError("failed_before_dispatch", "Slack execution is not available yet");
+  execute: (ctx, _capability, args) => slackPostMessage(ctx, args),
+  // No `reconcile`: finding a posted message needs history scopes we deliberately do not request.
+  // An ambiguous post therefore stays OUTCOME_UNKNOWN until a person verifies in Slack.
+  async refresh(current) {
+    const env = getEnv();
+    if (
+      !env.CONNECTOR_SLACK_CLIENT_ID ||
+      !env.CONNECTOR_SLACK_CLIENT_SECRET ||
+      !current.refreshToken
+    )
+      throw new ConnectorError("auth_expired", "Cannot refresh the Slack token");
+    const r = await refreshAccessToken(safeFetchFor("slack"), {
+      clientId: env.CONNECTOR_SLACK_CLIENT_ID,
+      clientSecret: env.CONNECTOR_SLACK_CLIENT_SECRET,
+      refreshToken: current.refreshToken,
+    });
+    return {
+      credentials: {
+        ...current,
+        accessToken: r.accessToken,
+        refreshToken: r.refreshToken ?? current.refreshToken,
+      },
+      expiresAt: r.expiresIn ? new Date(Date.now() + r.expiresIn * 1000) : null,
+    };
   },
 };

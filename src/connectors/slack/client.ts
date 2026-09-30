@@ -154,4 +154,49 @@ export class SlackClient {
     if (!ch) throw new ConnectorError("provider_rejected", "Unexpected response from Slack");
     return ch;
   }
+
+  /**
+   * The only Slack write. Single attempt (the transport never retries writes). `ok:false` answers are
+   * definitive (nothing was posted); transport ambiguity surfaces as maybeDispatched.
+   */
+  async postMessage(
+    channel: string,
+    text: string,
+    threadTs?: string,
+  ): Promise<{ channel: string; ts: string }> {
+    const res = await this.fetch(`${SLACK_API}/chat.postMessage`, {
+      method: "POST",
+      headers: slackHeaders(this.token, true),
+      // Links are not unfurled, so reviewers see exactly what recipients get; nothing else is sent.
+      body: JSON.stringify({
+        channel,
+        text,
+        unfurl_links: false,
+        unfurl_media: false,
+        ...(threadTs ? { thread_ts: threadTs } : {}),
+      }),
+    });
+    const { data } = await this.parse<Envelope & { channel?: string; ts?: string }>(res, true);
+    if (typeof data.ts !== "string" || typeof data.channel !== "string") {
+      throw new ConnectorError(
+        "verification_required",
+        "Slack accepted the request but returned an unexpected response",
+        true,
+      );
+    }
+    return { channel: data.channel, ts: data.ts };
+  }
+
+  /** Best-effort link to the posted message. Failure is harmless and never changes the outcome. */
+  async getPermalink(channel: string, ts: string): Promise<string | null> {
+    try {
+      const { data } = await this.call<Envelope & { permalink?: string }>("chat.getPermalink", {
+        channel,
+        message_ts: ts,
+      });
+      return typeof data.permalink === "string" ? data.permalink : null;
+    } catch {
+      return null;
+    }
+  }
 }
