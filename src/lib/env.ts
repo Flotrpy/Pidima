@@ -11,7 +11,7 @@ export type Env = z.infer<typeof schema>;
 let cached: Env | undefined;
 
 /** Validates required configuration once; error messages list names only, never values. */
-export function getEnv(source: NodeJS.ProcessEnv = process.env): Env {
+export function getEnv(source: Record<string, string | undefined> = process.env): Env {
   if (source === process.env && cached) return cached;
   const result = schema.safeParse(source);
   if (!result.success) {

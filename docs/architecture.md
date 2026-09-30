@@ -11,21 +11,21 @@ Phase 1 commits are counted from `f3af7505d6ad59bf08657b69e4f46855415a08b3`
 
 ## Decisions
 
-| Area | Choice |
-| --- | --- |
-| App framework | Next.js (App Router, TypeScript) |
-| Database | PostgreSQL with Drizzle ORM migrations |
-| User auth | Better Auth (Google, GitHub, verified email; unconfigured methods hidden) |
-| MCP | Official `@modelcontextprotocol/sdk`, Streamable HTTP |
-| Email connector | Gmail API via Google OAuth (sends as the connected user) |
-| Email notifications | Link-only messages through the same Gmail connector |
-| Motion | `motion` (Motion for React) |
-| Tests | Vitest (unit/integration), Playwright (e2e) |
-| Theme | Light-mode-first; no dark theme in Phase 1 |
+| Area                | Choice                                                                    |
+| ------------------- | ------------------------------------------------------------------------- |
+| App framework       | Next.js (App Router, TypeScript)                                          |
+| Database            | PostgreSQL with Drizzle ORM migrations                                    |
+| User auth           | Better Auth (Google, GitHub, verified email; unconfigured methods hidden) |
+| MCP                 | Official `@modelcontextprotocol/sdk`, Streamable HTTP                     |
+| Email connector     | Gmail API via Google OAuth (sends as the connected user)                  |
+| Email notifications | Link-only messages through the same Gmail connector                       |
+| Motion              | `motion` (Motion for React)                                               |
+| Tests               | Vitest (unit/integration), Playwright (e2e)                               |
+| Theme               | Light-mode-first; no dark theme in Phase 1                                |
 
 ## Pinned versions (npm latest at 2026-09-30)
 
-next 16.3.7, react 19.3.0, @modelcontextprotocol/sdk 1.31.0, better-auth 1.7.6,
+next 16.3.7 (typescript pinned to 5.9.3 because typescript-eslint does not yet support TS 7; eslint 9.39.5), react 19.3.0, @modelcontextprotocol/sdk 1.31.0, better-auth 1.7.6,
 drizzle-orm 0.45.3, drizzle-kit 0.31.11, motion 13.4.6, zod 4.6.5,
 vitest 5.0.3, @playwright/test 1.63.0, pg 8.23.0.
 
