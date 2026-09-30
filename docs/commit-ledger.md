@@ -18,7 +18,7 @@ Baseline: `f3af7505d6ad59bf08657b69e4f46855415a08b3`.
 
 | Milestone       | Status                                                    |
 | --------------- | --------------------------------------------------------- |
-| P1-001 – P1-051 | done (automated verification only; see `docs/testing.md`) |
+| P1-001 – P1-058 | done (automated verification only; see `docs/testing.md`) |
 | P1-045 – P1-070 | not started                                               |
 
 Nothing in "done" implies live provider, real Claude, or deployment verification. Those remain open.
