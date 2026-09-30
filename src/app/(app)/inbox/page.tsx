@@ -1,6 +1,13 @@
+import { redirect } from "next/navigation";
+import { requireActiveContext } from "@/server/active-workspace";
+import { getOnboardingState, landingPath } from "@/server/onboarding";
+
 export const metadata = { title: "Inbox" };
 
-export default function InboxPage() {
+export default async function InboxPage() {
+  const { workspace, role } = await requireActiveContext();
+  const state = await getOnboardingState(workspace.id);
+  if (landingPath(state, role === "owner") === "/onboarding") redirect("/onboarding");
   return (
     <>
       <h1>Inbox</h1>

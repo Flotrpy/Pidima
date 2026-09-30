@@ -20,6 +20,12 @@ const PROTECTED = [
  */
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
+  // Returning users skip the marketing page and go straight to the app.
+  if (pathname === "/" && getSessionCookie(req)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/inbox";
+    return NextResponse.redirect(url);
+  }
   if (!PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`)))
     return NextResponse.next();
   if (getSessionCookie(req)) return NextResponse.next();
