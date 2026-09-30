@@ -17,6 +17,7 @@ const fail = (text: string): ToolResult => ({ isError: true, text });
 export function describeState(
   state: string,
   category?: string | null,
+  capability?: string,
 ): { text: string; terminal: boolean } {
   switch (state) {
     case "PENDING_APPROVAL":
@@ -29,7 +30,13 @@ export function describeState(
     case "EXECUTING":
       return { text: "Approved and being carried out now.", terminal: false };
     case "SUCCEEDED":
-      return { text: "Approved and completed. The provider confirmed the result.", terminal: true };
+      return {
+        text:
+          capability === "email.propose_message"
+            ? "Approved and sent: the email provider accepted the message. Delivery to an inbox and reading are not confirmed."
+            : "Approved and completed. The provider confirmed the result.",
+        terminal: true,
+      };
     case "FAILED":
       return {
         text:
@@ -125,7 +132,7 @@ export async function getStatusTool(
     .orderBy(desc(approvalDecisions.createdAt));
   const last = decisions.find((d) => d.decision !== "edit");
   const edited = decisions.some((d) => d.decision === "edit");
-  const desc_ = describeState(p.state, exec?.errorCategory);
+  const desc_ = describeState(p.state, exec?.errorCategory, p.capability);
 
   const structured: Record<string, unknown> = {
     proposal_id: p.id,

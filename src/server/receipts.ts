@@ -74,6 +74,8 @@ export type ReceiptBody = {
     result: {
       providerId: string | null;
       url: string | null;
+      /** What the provider result does and does not prove. */
+      note: string | null;
       /** Whitelisted, non-sensitive provider facts (issue number, channel, message timestamp, how it was sent). */
       details: Record<string, string | number | boolean | null>;
     } | null;
@@ -87,6 +89,11 @@ export type ReceiptBody = {
 
 export const receiptNumber = (id: string) => `RCPT-${id.slice(0, 8).toUpperCase()}`;
 const MAX_DIFF_BYTES = 50_000;
+
+export const RESULT_NOTES: Record<string, string> = {
+  "email.propose_message":
+    "Accepted by the email provider for sending. This does not confirm delivery to an inbox or that anyone read it.",
+};
 /** Provider result fields that may appear on a receipt. Anything else (tokens, bodies) is dropped. */
 const RESULT_DETAIL_KEYS = [
   "issueNumber",
@@ -96,6 +103,10 @@ const RESULT_DETAIL_KEYS = [
   "threadTs",
   "sentAs",
   "reconciled",
+  "messageId",
+  "threadId",
+  "recipientCount",
+  "acceptedByProvider",
 ] as const;
 
 function safeDetails(
@@ -265,6 +276,7 @@ export async function buildReceiptBody(
               ? {
                   providerId: result?.providerId ?? null,
                   url: result?.url ?? null,
+                  note: RESULT_NOTES[p.capability] ?? null,
                   details: safeDetails(result as Record<string, unknown> | null),
                 }
               : null,
