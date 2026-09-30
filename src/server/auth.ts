@@ -2,10 +2,12 @@ import "server-only";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { magicLink } from "better-auth/plugins";
 import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
 import { configuredAuthMethods, getEnv } from "@/lib/env";
+import { redirectParamsAreSafe } from "@/lib/redirect";
 import { sendMail } from "./mailer";
 import { createWorkspace } from "./workspaces";
 
@@ -36,6 +38,26 @@ function build() {
     advanced: {
       useSecureCookies: env.NODE_ENV === "production",
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
+    },
+    hooks: {
+      // Defence in depth: refuse off-site redirect targets on every auth endpoint, whether they
+      // arrive in the body (sign-in) or the query (verify links).
+      before: createAuthMiddleware(async (ctx) => {
+        const origin = new URL(env.APP_URL).origin;
+        if (!redirectParamsAreSafe(ctx.body, origin) || !redirectParamsAreSafe(ctx.query, origin)) {
+          throw new APIError("BAD_REQUEST", { message: "Invalid redirect target" });
+        }
+      }),
+    },
+    account: {
+      accountLinking: {
+        enabled: true,
+        // No provider is trusted blindly: an identity links to an existing user only when the
+        // provider asserts a verified email AND the local account's email is verified.
+        trustedProviders: [],
+        allowDifferentEmails: false,
+        requireLocalEmailVerified: true,
+      },
     },
     databaseHooks: {
       user: {

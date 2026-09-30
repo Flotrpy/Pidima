@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { safeReturnTo } from "@/lib/redirect";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { configuredAuthMethods, getEnv } from "@/lib/env";
 import { getSessionUser } from "@/server/session";
@@ -6,8 +7,13 @@ import { getSessionUser } from "@/server/session";
 export const metadata = { title: "Sign in" };
 export const dynamic = "force-dynamic";
 
-export default async function SignInPage() {
-  if (await getSessionUser()) redirect("/inbox");
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ returnTo?: string }>;
+}) {
+  const returnTo = safeReturnTo((await searchParams).returnTo);
+  if (await getSessionUser()) redirect(returnTo);
   const methods = configuredAuthMethods(getEnv());
   return (
     <div className="container" style={{ maxWidth: 440, paddingTop: 64 }}>
@@ -17,7 +23,7 @@ export default async function SignInPage() {
         your account.
       </p>
       <div className="card">
-        <SignInForm methods={methods} />
+        <SignInForm methods={methods} callbackURL={returnTo} />
       </div>
     </div>
   );
