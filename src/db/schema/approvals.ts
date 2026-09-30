@@ -14,7 +14,7 @@ import { sql } from "drizzle-orm";
 import { users } from "./auth";
 import { connectorAccounts } from "./connectors";
 import { mcpGrants } from "./mcp";
-import { capabilityEnum } from "./policies";
+import { capabilityEnum } from "./enums";
 import { workspaces } from "./workspaces";
 
 export const proposalStateEnum = pgEnum("proposal_state", [

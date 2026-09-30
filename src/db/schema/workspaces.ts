@@ -10,6 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
+import { capabilityEnum } from "./enums";
 
 export const roleEnum = pgEnum("workspace_role", ["owner", "approver", "member", "viewer"]);
 
@@ -37,6 +38,8 @@ export const workspaceMemberships = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: roleEnum("role").notNull(),
+    /** Proposal types this member may decide. NULL means every type their role allows. */
+    approvalCapabilities: capabilityEnum("approval_capabilities").array(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

@@ -11,9 +11,12 @@ import {
 import { getEnv } from "@/lib/env";
 import { recordAudit, type Executor } from "./audit";
 import { sendMail } from "./mailer";
+import { requirePermission } from "./authz";
+import { revokeUserSessions } from "./session-admin";
 import { randomToken, sha256 } from "./tokens";
 
-export type Role = "owner" | "approver" | "member" | "viewer";
+import type { Capability, Role } from "@/lib/permissions";
+export type { Role };
 export const ROLES: readonly Role[] = ["owner", "approver", "member", "viewer"];
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CAPABILITIES = [
@@ -110,9 +113,7 @@ export async function getMembership(userId: string, workspaceId: string) {
 }
 
 async function requireOwner(actorId: string, workspaceId: string) {
-  const m = await getMembership(actorId, workspaceId);
-  if (!m) throw new WorkspaceError("not_found", "Workspace not found");
-  if (m.role !== "owner") throw new WorkspaceError("forbidden", "Only owners can manage members");
+  await requirePermission(actorId, workspaceId, "members.manage");
 }
 
 export async function inviteMember(
@@ -284,6 +285,8 @@ export async function changeMemberRole(
       tx,
     );
   });
+  // Privilege change: force the affected user to re-authenticate (not the actor acting on themselves).
+  if (targetUserId !== actorId) await revokeUserSessions(targetUserId);
 }
 
 export async function removeMember(actorId: string, workspaceId: string, targetUserId: string) {
@@ -315,6 +318,8 @@ export async function removeMember(actorId: string, workspaceId: string, targetU
       tx,
     );
   });
+  // Privilege change: force the affected user to re-authenticate (not the actor acting on themselves).
+  if (targetUserId !== actorId) await revokeUserSessions(targetUserId);
 }
 
 export async function listMembers(actorId: string, workspaceId: string) {
@@ -326,6 +331,7 @@ export async function listMembers(actorId: string, workspaceId: string) {
       name: users.name,
       email: users.email,
       role: workspaceMemberships.role,
+      approvalCapabilities: workspaceMemberships.approvalCapabilities,
     })
     .from(workspaceMemberships)
     .innerJoin(users, eq(users.id, workspaceMemberships.userId))
@@ -346,4 +352,34 @@ export async function listMembers(actorId: string, workspaceId: string) {
       ),
     );
   return { members, invitations };
+}
+
+/** Restricts which proposal types a member may decide. Pass null to allow every type their role permits. */
+export async function setApprovalCapabilities(
+  actorId: string,
+  workspaceId: string,
+  targetUserId: string,
+  caps: Capability[] | null,
+) {
+  await requireOwner(actorId, workspaceId);
+  const res = await getDb()
+    .update(workspaceMemberships)
+    .set({ approvalCapabilities: caps })
+    .where(
+      and(
+        eq(workspaceMemberships.workspaceId, workspaceId),
+        eq(workspaceMemberships.userId, targetUserId),
+      ),
+    )
+    .returning({ id: workspaceMemberships.id });
+  if (res.length === 0) throw new WorkspaceError("not_found", "Member not found");
+  await recordAudit({
+    workspaceId,
+    actorType: "user",
+    actorId,
+    action: "member.approval_scope_changed",
+    subjectType: "user",
+    subjectId: targetUserId,
+    detail: { scope: caps ?? "all" },
+  });
 }

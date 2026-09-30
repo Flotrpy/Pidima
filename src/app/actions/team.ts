@@ -9,6 +9,7 @@ import {
   inviteMember,
   removeMember,
   revokeInvitation,
+  setApprovalCapabilities,
   ROLES,
   type Role,
 } from "@/server/workspaces";
@@ -79,4 +80,17 @@ export async function acceptInvitationAction(form: FormData) {
     redirect(`/inbox?invite_error=${encodeURIComponent(msg)}`);
   }
   redirect("/inbox");
+}
+
+export async function setApprovalScopeAction(form: FormData) {
+  const { user, workspace } = await requireActiveContext();
+  const all = ["github.propose_issue", "slack.propose_message", "email.propose_message"] as const;
+  const picked = all.filter((c) => form.get(c) === "on");
+  await setApprovalCapabilities(
+    user.id,
+    workspace.id,
+    String(form.get("userId")),
+    picked.length === all.length ? null : [...picked],
+  );
+  revalidatePath("/team");
 }

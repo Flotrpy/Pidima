@@ -9,13 +9,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { connectorAccounts } from "./connectors";
+import { capabilityEnum } from "./enums";
 import { workspaces } from "./workspaces";
-
-export const capabilityEnum = pgEnum("capability", [
-  "github.propose_issue",
-  "slack.propose_message",
-  "email.propose_message",
-]);
 
 export const capabilityPolicies = pgTable(
   "capability_policies",

@@ -1,6 +1,11 @@
 import { InviteForm } from "@/components/team/InviteForm";
 import { Button } from "@/components/ui";
-import { changeRoleAction, removeMemberAction, revokeInvitationAction } from "@/app/actions/team";
+import {
+  changeRoleAction,
+  removeMemberAction,
+  revokeInvitationAction,
+  setApprovalScopeAction,
+} from "@/app/actions/team";
 import { requireActiveContext } from "@/server/active-workspace";
 import { listMembers } from "@/server/workspaces";
 
@@ -59,6 +64,35 @@ export default async function TeamPage() {
               ) : (
                 <span className="badge badge-neutral">{m.role}</span>
               )}
+              {isOwner && m.role === "approver" ? (
+                <form action={setApprovalScopeAction} className="row" style={{ width: "100%" }}>
+                  <input type="hidden" name="userId" value={m.userId} />
+                  <fieldset style={{ border: 0, padding: 0, margin: 0 }} className="row">
+                    <legend className="hint">May decide:</legend>
+                    {(
+                      [
+                        "github.propose_issue",
+                        "slack.propose_message",
+                        "email.propose_message",
+                      ] as const
+                    ).map((c) => (
+                      <label key={c} className="row" style={{ gap: 6 }}>
+                        <input
+                          type="checkbox"
+                          name={c}
+                          defaultChecked={
+                            m.approvalCapabilities === null || m.approvalCapabilities.includes(c)
+                          }
+                        />
+                        {c.split(".")[0]}
+                      </label>
+                    ))}
+                  </fieldset>
+                  <Button type="submit" small>
+                    Save scope
+                  </Button>
+                </form>
+              ) : null}
             </li>
           ))}
         </ul>

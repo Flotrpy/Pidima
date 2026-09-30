@@ -1,0 +1,1 @@
+ALTER TABLE "workspace_memberships" ADD COLUMN "approval_capabilities" "capability"[];
