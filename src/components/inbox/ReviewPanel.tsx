@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { StatusBadge } from "@/components/ui";
 import type { ProposalDetail } from "@/server/inbox";
 import { formatUtc } from "@/lib/time";
+import { DiffView } from "./DiffView";
 import { LongText } from "./LongText";
 import { RelativeTime } from "./RelativeTime";
 
@@ -81,6 +82,17 @@ export function ReviewPanel({ d, actions }: { d: ProposalDetail; actions?: React
           ))}
         </dl>
       </section>
+
+      {d.version > 1 ? (
+        <DiffView
+          before={d.originalArgs}
+          after={d.args}
+          editedBy={
+            d.versions.find((v) => v.authorType === "human" && v.version === d.version)
+              ?.authorName ?? null
+          }
+        />
+      ) : null}
 
       <section aria-labelledby="context-h" className="stack">
         <h2 id="context-h" style={{ fontSize: "1rem" }}>

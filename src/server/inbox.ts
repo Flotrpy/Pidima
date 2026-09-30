@@ -220,6 +220,8 @@ export type ProposalDetail = {
   requiredScopes: string[];
   hiddenDirectionWarning: boolean;
   args: Record<string, unknown>;
+  /** The AI's first version, kept so reviewers and receipts can see what a person changed. */
+  originalArgs: Record<string, unknown>;
   decisions: { decision: string; by: string; at: Date; reason: string | null }[];
   execution: {
     state: string;
@@ -320,6 +322,10 @@ export async function getProposalDetail(
     requiredScopes: def.requiredScopes,
     hiddenDirectionWarning: hasHiddenDirectionControls(...flat),
     args,
+    originalArgs: (versions.find((x) => x.v.version === 1)?.v.args ?? args) as Record<
+      string,
+      unknown
+    >,
     decisions: decisions.map(({ d, by }) => ({
       decision: d.decision,
       by,

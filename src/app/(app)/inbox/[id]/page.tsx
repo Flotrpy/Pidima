@@ -1,4 +1,7 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
+import { canDecide } from "@/lib/permissions";
+import { loadMembership } from "@/server/authz";
 import { InboxList } from "@/components/inbox/InboxList";
 import { ReviewPanel } from "@/components/inbox/ReviewPanel";
 import { requireActiveContext } from "@/server/active-workspace";
@@ -26,6 +29,11 @@ export default async function ReviewPage({
       notFound();
     throw e;
   }
+  const m = await loadMembership(user.id, workspace.id);
+  const canEdit =
+    detail.state === "PENDING_APPROVAL" &&
+    !!m &&
+    canDecide(m.role, m.approvalCapabilities, detail.capability as never);
   const filter = isFilterKey(sp.f) ? sp.f : "needs_review";
   const [counts, { items, nextCursor }] = await Promise.all([
     countsByFilter(user.id, workspace.id),
@@ -41,7 +49,18 @@ export default async function ReviewPage({
         selectedId={id}
       />
       <div className="inbox-detail">
-        <ReviewPanel d={detail} />
+        <ReviewPanel
+          d={detail}
+          actions={
+            canEdit ? (
+              <div className="row">
+                <Link href={`/inbox/${detail.id}/edit`} className="btn btn-sm">
+                  Edit
+                </Link>
+              </div>
+            ) : null
+          }
+        />
       </div>
     </div>
   );

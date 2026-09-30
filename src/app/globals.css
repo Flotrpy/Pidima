@@ -713,3 +713,44 @@ body:has(dialog[open]) {
     overflow: auto;
   }
 }
+
+/* Diff */
+.diff-field {
+  display: grid;
+  gap: 4px;
+}
+.diff-h {
+  font-size: 0.9rem;
+  margin: 0;
+  color: var(--text-2);
+}
+.diff-block {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+}
+.diff-line {
+  display: grid;
+  grid-template-columns: 1.6em 1fr;
+  padding: 1px 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diff-mark {
+  font-weight: 700;
+  user-select: none;
+}
+.diff-add {
+  background: var(--success-bg);
+}
+.diff-del {
+  background: var(--failure-bg);
+}
+.diff-add .diff-mark {
+  color: var(--success);
+}
+.diff-del .diff-mark {
+  color: var(--failure);
+}
