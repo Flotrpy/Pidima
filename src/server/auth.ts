@@ -7,6 +7,7 @@ import { getDb } from "@/db/client";
 import * as schema from "@/db/schema";
 import { configuredAuthMethods, getEnv } from "@/lib/env";
 import { sendMail } from "./mailer";
+import { createWorkspace } from "./workspaces";
 
 function build() {
   const env = getEnv();
@@ -35,6 +36,16 @@ function build() {
     advanced: {
       useSecureCookies: env.NODE_ENV === "production",
       defaultCookieAttributes: { httpOnly: true, sameSite: "lax" },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          // Every account starts with a personal workspace so the inbox is never a dead end.
+          after: async (user) => {
+            await createWorkspace(user.id, `${user.name || "My"}'s workspace`, { personal: true });
+          },
+        },
+      },
     },
     socialProviders: {
       ...(methods.includes("google") && {
