@@ -18,7 +18,7 @@ Migrations are additive and forward-only. To roll back the application, redeploy
 ## Key rotation
 
 1. Generate a new key, add it as `CREDENTIAL_ENCRYPTION_KEY_V<n+1>`; it becomes active automatically (or pin with `CREDENTIAL_ENCRYPTION_ACTIVE_VERSION`). Old keys stay to decrypt existing rows.
-2. New and refreshed credentials use the new key. Keep old keys until every connector has been refreshed or reconnected (check `key_version` in `credentials`).
+2. New and refreshed credentials use the new key. Keep old keys until every connector has been refreshed or reconnected (check `key_version` in `encrypted_credentials`).
 3. Remove an old key only when no row references it.
    Rotating `BETTER_AUTH_SECRET` signs everyone out and invalidates pending OAuth transactions; MCP tokens are unaffected.
 

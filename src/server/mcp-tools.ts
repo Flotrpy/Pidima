@@ -105,7 +105,8 @@ export async function callProposeTool(
           `Workspace policy does not allow this: ${(e.details.reasons as { message: string }[]).map((r) => r.message).join(" ")}`,
           { code: e.code },
         );
-      if (e.code === "rate_limited") return fail(`${e.message} Slow down and retry.`, { code: e.code });
+      if (e.code === "rate_limited")
+        return fail(`${e.message} Slow down and retry.`, { code: e.code });
       if (e.code === "destination_invalid")
         return fail(`${e.message} Nothing was proposed.`, { code: e.code });
       if (e.code === "connector_ambiguous")
