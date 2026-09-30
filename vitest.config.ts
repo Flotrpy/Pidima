@@ -14,6 +14,8 @@ export default defineConfig({
       BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret-1234",
       CREDENTIAL_ENCRYPTION_KEY_V1: Buffer.alloc(32, 1).toString("base64"),
       CRON_SECRET: "cron-secret-cron-secret-cron-secret-0001",
+      CONNECTOR_GITHUB_CLIENT_ID: "gh-client-id",
+      CONNECTOR_GITHUB_CLIENT_SECRET: "gh-client-secret",
       SMTP_URL: "smtp://unused.test",
       SMTP_FROM: "test@example.test",
     },

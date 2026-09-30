@@ -51,7 +51,62 @@ const CAPABILITY_TEXT: Record<string, string> = {
 const fmt = (d: Date | null) =>
   d ? d.toISOString().replace("T", " ").slice(0, 16) + " UTC" : "Never";
 
-export default async function ConnectionsPage() {
+const CONNECT_ERRORS: Record<string, string> = {
+  denied: "The connection was canceled, so nothing was connected.",
+  invalid: "That connection attempt was invalid or expired. Start again below.",
+  failed: "The provider could not complete the connection. Try again in a moment.",
+  insufficient_scope:
+    "The permissions granted were not enough to propose this kind of action. Reconnect and accept the requested permissions.",
+  not_configured: "This service has not been configured by the administrator yet.",
+  forbidden: "Only workspace owners can manage connections.",
+};
+
+/** GitHub offers a least-privilege choice at connect time; other providers have a single flow. */
+function ConnectLinks({
+  provider,
+  name,
+  hasAccounts,
+  reconnect,
+}: {
+  provider: string;
+  name: string;
+  hasAccounts?: boolean;
+  reconnect?: boolean;
+}) {
+  const base = `/api/connectors/${provider}/start`;
+  if (provider === "github") {
+    return (
+      <div className="row">
+        <ButtonLink
+          href={`${base}?access=public`}
+          variant={!hasAccounts && !reconnect ? "primary" : "secondary"}
+          small
+        >
+          {reconnect
+            ? "Reconnect (public repos)"
+            : hasAccounts
+              ? "Add account (public repos)"
+              : "Connect: public repos only"}
+        </ButtonLink>
+        <ButtonLink href={`${base}?access=all`} small>
+          {reconnect ? "Reconnect (incl. private)" : "Include private repos"}
+        </ButtonLink>
+      </div>
+    );
+  }
+  return (
+    <ButtonLink href={base} variant={!hasAccounts && !reconnect ? "primary" : "secondary"} small>
+      {reconnect ? "Reconnect" : hasAccounts ? "Add another account" : `Connect ${name}`}
+    </ButtonLink>
+  );
+}
+
+export default async function ConnectionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ connect_error?: string; connected?: string }>;
+}) {
+  const sp = await searchParams;
   const { user, workspace } = await requireActiveContext();
   await requirePermission(user.id, workspace.id, "connectors.manage");
   const connectors = await listConnectors(user.id, workspace.id);
@@ -66,6 +121,17 @@ export default async function ConnectionsPage() {
           authorized person approves the exact request.
         </p>
       </div>
+
+      {sp.connected ? (
+        <p className="alert" role="status">
+          Connected. Run a test to confirm it works.
+        </p>
+      ) : null}
+      {sp.connect_error ? (
+        <p className="alert alert-error" role="alert">
+          {CONNECT_ERRORS[sp.connect_error] ?? "The connection could not be completed."}
+        </p>
+      ) : null}
 
       {connectors.length === 0 ? (
         <p className="alert" role="status">
@@ -83,13 +149,11 @@ export default async function ConnectionsPage() {
                 {meta.displayName}
               </h2>
               {configured.has(provider) ? (
-                <ButtonLink
-                  href={`/api/connectors/${provider}/start`}
-                  variant={accounts.length ? "secondary" : "primary"}
-                  small
-                >
-                  {accounts.length ? "Add another account" : `Connect ${meta.displayName}`}
-                </ButtonLink>
+                <ConnectLinks
+                  provider={provider}
+                  name={meta.displayName}
+                  hasAccounts={accounts.length > 0}
+                />
               ) : (
                 <span className="badge badge-neutral">Not configured by the administrator</span>
               )}
@@ -128,9 +192,7 @@ export default async function ConnectionsPage() {
                       <TestConnection accountId={a.id} />
                     ) : null}
                     {configured.has(provider) ? (
-                      <ButtonLink href={`/api/connectors/${provider}/start`} small>
-                        Reconnect
-                      </ButtonLink>
+                      <ConnectLinks provider={provider} name={meta.displayName} reconnect />
                     ) : null}
                     {a.status !== "disconnected" ? (
                       <form action={disconnectAction}>
