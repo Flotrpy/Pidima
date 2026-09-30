@@ -12,6 +12,7 @@ import {
   clampExpiry,
   evaluatePolicy,
   normalizeRuleValue,
+  scopesSatisfied,
   type Effect,
   type PolicyDecision,
   type PolicyFacts,
@@ -19,7 +20,7 @@ import {
   type ResourceRule,
 } from "@/approvals/policy";
 import { getCapability } from "@/connectors/registry";
-import type { Capability } from "@/lib/permissions";
+import { can, type Capability } from "@/lib/permissions";
 import { recordAudit } from "./audit";
 import { loadMembership, requirePermission } from "./authz";
 import { WorkspaceError } from "./workspaces";
@@ -278,4 +279,48 @@ export async function removeResourceRule(actorId: string, workspaceId: string, r
     subjectType: "resource_policy",
     subjectId: ruleId,
   });
+}
+
+/**
+ * Capabilities this MCP grant may currently propose: enabled by workspace policy, backed by an
+ * active connector holding the provider scopes, and permitted by a live grant and user. Used for
+ * tool discovery only. It is never treated as authorization; every call re-checks.
+ */
+export async function availableCapabilities(grantId: string): Promise<Capability[]> {
+  const db = getDb();
+  const [grant] = await db.select().from(mcpGrants).where(eq(mcpGrants.id, grantId));
+  if (!grant || grant.revokedAt || !grant.scopes.includes("proposals:create")) return [];
+  const m = await loadMembership(grant.userId, grant.workspaceId);
+  if (!m || !can(m.role, "clients.connect")) return [];
+
+  const policies = await db
+    .select()
+    .from(capabilityPolicies)
+    .where(
+      and(
+        eq(capabilityPolicies.workspaceId, grant.workspaceId),
+        eq(capabilityPolicies.enabled, true),
+      ),
+    );
+  const connectors = await db
+    .select()
+    .from(connectorAccounts)
+    .where(
+      and(
+        eq(connectorAccounts.workspaceId, grant.workspaceId),
+        eq(connectorAccounts.status, "active"),
+      ),
+    );
+  const out: Capability[] = [];
+  for (const p of policies) {
+    const def = getCapability(p.capability);
+    if (!def) continue;
+    if (
+      connectors.some(
+        (c) => c.provider === def.provider && scopesSatisfied(def.requiredScopes, c.grantedScopes),
+      )
+    )
+      out.push(p.capability);
+  }
+  return out;
 }

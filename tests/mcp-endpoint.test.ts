@@ -9,9 +9,9 @@ const URL_ = "http://localhost:3000/api/mcp";
 const authed: Authenticator = async () => ({
   authInfo: { token: "t", clientId: "c", scopes: ["proposals:create"] },
   principal: {
-    grantId: "g",
+    grantId: "00000000-0000-0000-0000-000000000001",
     userId: "u",
-    workspaceId: "w",
+    workspaceId: "00000000-0000-0000-0000-000000000002",
     clientLabel: "Claude",
     scopes: ["proposals:create"],
   },
