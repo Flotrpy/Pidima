@@ -8,6 +8,7 @@ import { getCapability, getRuntime } from "@/connectors/registry";
 import type { ExecutionOutcome } from "@/connectors/types";
 import { hostname } from "node:os";
 import { onProposalApproved } from "./decisions";
+import { notifyExecutionOutcome } from "./notifications";
 import { backfillMissingReceipts } from "./receipts";
 import {
   claimExecution,
@@ -65,6 +66,11 @@ export async function executeApprovedProposal(
   // A definitive "your token is dead" answer must be visible in the UI, not just on this proposal.
   if (outcome.status === "failed" && outcome.category === "auth_expired")
     await reportAuthFailure(claim.proposal.connectorAccountId);
+  if (outcome.status !== "succeeded")
+    await notifyExecutionOutcome(
+      claim.proposal.id,
+      outcome.status === "failed" ? "failed" : "unknown",
+    ).catch(() => undefined);
   logEvent("execution.finished", {
     workspaceId: claim.proposal.workspaceId,
     proposalId: claim.proposal.id,

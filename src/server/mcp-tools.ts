@@ -7,6 +7,10 @@ import { verifyGrantForCall } from "./mcp-grant";
 import { availableCapabilities } from "./policy";
 import { ProposalError, createProposal } from "./proposals";
 import { logEvent } from "./log";
+import { startNotifications } from "./notifications";
+
+// Review requests are notified in production; tests opt in explicitly.
+if (process.env.NODE_ENV !== "test") startNotifications();
 
 export type ToolResult = { isError: boolean; text: string; structured?: Record<string, unknown> };
 

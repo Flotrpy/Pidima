@@ -10,11 +10,13 @@ export function AppShell({
   user,
   role,
   workspaceName,
+  unread = 0,
   children,
 }: {
   user: { name: string };
   role: Role;
   workspaceName: string;
+  unread?: number;
   children: ReactNode;
 }) {
   // Navigation is a convenience only; every page and action re-checks on the server.
@@ -35,6 +37,13 @@ export function AppShell({
           </Link>
         </div>
         <div className="row">
+          <Link
+            href="/notifications"
+            className="btn btn-sm btn-ghost"
+            aria-label={`Notifications, ${unread} unread`}
+          >
+            Notifications{unread > 0 ? <span className="badge badge-pending">{unread}</span> : null}
+          </Link>
           <span className="muted app-user">
             {workspaceName} · {role} · {user.name}
           </span>

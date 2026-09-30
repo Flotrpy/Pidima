@@ -4,6 +4,7 @@ import { getDb } from "@/db/client";
 import { connectorAccounts } from "@/db/schema";
 import { ConnectorError } from "@/connectors/errors";
 import { recordAudit } from "./audit";
+import { notifyConnectorUnhealthy } from "./notifications";
 import {
   deleteCredentials,
   loadCredentials,
@@ -45,8 +46,10 @@ async function setStatus(id: string, status: Status, action: string, workspaceId
 /** Provider said the token is no longer valid (401 / invalid_grant / token_revoked). */
 export async function reportAuthFailure(connectorAccountId: string) {
   const acct = await accountStatus(connectorAccountId);
-  if (acct && acct.status === "active")
+  if (acct && acct.status === "active") {
     await setStatus(connectorAccountId, "needs_reauth", "connector.needs_reauth", acct.workspaceId);
+    await notifyConnectorUnhealthy(acct.workspaceId, connectorAccountId).catch(() => undefined);
+  }
 }
 
 /** Owner revoked or disconnected the connector: unexecuted proposals must not proceed. */
