@@ -75,8 +75,7 @@ export function InboxList({
                 >
                   <strong>{r.title}</strong>
                   <span className="row" style={{ gap: 6, flexWrap: "nowrap" }}>
-                    {r.state === "PENDING_APPROVAL" &&
-                    r.expiresAt.getTime() - Date.now() < 15 * 60_000 ? (
+                    {r.urgent ? (
                       <span className="badge badge-failure">
                         <span aria-hidden="true">⏱</span>
                         <span>Expiring soon</span>

@@ -46,6 +46,8 @@ export type InboxRow = {
   state: ProposalState;
   createdAt: Date;
   expiresAt: Date;
+  /** Pending and expiring within 15 minutes. Computed server-side so rendering stays pure. */
+  urgent: boolean;
 };
 
 const encodeCursor = (createdAt: Date, id: string) =>
@@ -127,6 +129,7 @@ export async function listProposals(
     state: p.state as ProposalState,
     createdAt: p.createdAt,
     expiresAt: p.expiresAt,
+    urgent: p.state === "PENDING_APPROVAL" && p.expiresAt.getTime() - Date.now() < 15 * 60_000,
   }));
   const last = page.at(-1);
   return {
