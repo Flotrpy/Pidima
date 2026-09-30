@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { removeRuleAction } from "@/app/actions/policies";
 import { CapabilityForm } from "@/components/policies/CapabilityForm";
 import { RuleForm } from "@/components/policies/RuleForm";
+import { ChannelPicker } from "@/components/policies/ChannelPicker";
 import { RepoPicker } from "@/components/policies/RepoPicker";
 import { Button } from "@/components/ui";
 import { requireActiveContext } from "@/server/active-workspace";
@@ -38,6 +39,8 @@ export default async function PoliciesPage() {
   ]);
   const github = connectors.filter((c) => c.provider === "github" && c.status === "active");
   const repoRules = rules.filter((r) => r.kind === "github_repo");
+  const slack = connectors.filter((c) => c.provider === "slack" && c.status === "active");
+  const channelRules = rules.filter((r) => r.kind === "slack_channel");
 
   return (
     <div className="stack" style={{ ["--gap" as string]: "28px" }}>
@@ -126,6 +129,69 @@ export default async function PoliciesPage() {
             fallback={<p className="muted">Loading repositories for {c.displayName}…</p>}
           >
             <RepoPicker connectorId={c.id} name={c.displayName} />
+          </Suspense>
+        ))}
+      </section>
+
+      <section className="stack" aria-labelledby="sl-h">
+        <h2 id="sl-h" style={{ fontSize: "1.15rem" }}>
+          Slack channels
+        </h2>
+        <p className="muted">
+          AI clients can only propose messages to channels the connection is already a member of.
+          With no rules, any such channel is permitted. As soon as you add an <strong>Allow</strong>{" "}
+          rule, only allowed channels are accepted. <strong>Block</strong> always wins.
+        </p>
+        {channelRules.length > 0 ? (
+          <ul className="card plain-list" aria-label="Channel rules">
+            {channelRules.map((r) => (
+              <li key={r.id} className="row list-row">
+                <span
+                  className={`badge ${r.effect === "allow" ? "badge-success" : "badge-failure"}`}
+                >
+                  <span aria-hidden="true">{r.effect === "allow" ? "✓" : "⊘"}</span>
+                  <span>{r.effect === "allow" ? "Allow" : "Block"}</span>
+                </span>
+                <span className="mono" style={{ flex: 1 }}>
+                  {r.value}
+                </span>
+                <form action={removeRuleAction}>
+                  <input type="hidden" name="ruleId" value={r.id} />
+                  <Button
+                    type="submit"
+                    small
+                    variant="danger"
+                    aria-label={`Remove rule for ${r.value}`}
+                  >
+                    Remove
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="alert" role="status">
+            No channel rules: every channel the connection belongs to is currently permitted.
+          </p>
+        )}
+        <div className="card">
+          <RuleForm
+            kind="slack_channel"
+            placeholder="C0123456789"
+            hint="A Slack channel ID (shown next to each channel below)."
+            effects={["allow", "block"]}
+            connectors={slack.map((c) => ({ id: c.id, name: c.displayName }))}
+          />
+        </div>
+        {slack.length === 0 ? (
+          <p className="muted">Connect Slack on the Connections page to manage channels.</p>
+        ) : null}
+        {slack.map((c) => (
+          <Suspense
+            key={c.id}
+            fallback={<p className="muted">Loading channels for {c.displayName}…</p>}
+          >
+            <ChannelPicker connectorId={c.id} name={c.displayName} />
           </Suspense>
         ))}
       </section>
