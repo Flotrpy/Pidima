@@ -3,6 +3,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { connectorAccounts, connectorTests } from "@/db/schema";
 import { ConnectorError } from "@/connectors/errors";
+import { initConnectors } from "@/connectors/init";
 import { getRuntime } from "@/connectors/registry";
 import { safeFetchFor } from "@/connectors/transport";
 import type { HealthTestResult, Provider, RuntimeContext } from "@/connectors/types";
@@ -11,6 +12,8 @@ import { requirePermission } from "./authz";
 import { getAccessToken, reportAuthFailure, revokeConnector } from "./credentials";
 import { storeCredentials, type StoredCredentials } from "./vault";
 import { WorkspaceError } from "./workspaces";
+
+initConnectors();
 
 type Listener = (event: {
   workspaceId: string;
@@ -168,6 +171,7 @@ export async function testConnector(actorId: string, accountId: string) {
     };
   }
 
+  if (result.authFailed) await reportAuthFailure(acct.id);
   const finishedAt = new Date();
   await getDb().transaction(async (tx) => {
     await tx.insert(connectorTests).values({

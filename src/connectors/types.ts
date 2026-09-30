@@ -49,6 +49,8 @@ export type HealthStepResult = {
 
 export type HealthTestResult = {
   overall: "pass" | "fail" | "partial";
+  /** Set when the provider definitively rejected the credential, so the connector must be re-authorized. */
+  authFailed?: boolean;
   steps: HealthStepResult[];
   identity?: { displayName: string; externalAccountId: string };
   grantedScopes?: string[];

@@ -76,6 +76,29 @@ export function ruleMatches(kind: ResourceKind, ruleValue: string, value: string
   return r === v;
 }
 
+/**
+ * Single source of truth for allowlist/blocklist rules on repos, channels and senders.
+ * Blocks always win; once any allow rule applies to the connector, the allowlist is exclusive.
+ */
+export function checkResource(
+  kind: Exclude<ResourceKind, "email_domain">,
+  value: string,
+  rules: ResourceRule[],
+  connectorAccountId: string | null,
+): { allowed: true } | { allowed: false; code: "resource_blocked" | "resource_not_allowed" } {
+  const applicable = rules.filter(
+    (r) =>
+      r.kind === kind &&
+      (r.connectorAccountId === null || r.connectorAccountId === connectorAccountId),
+  );
+  if (applicable.some((r) => r.effect === "block" && ruleMatches(kind, r.value, value)))
+    return { allowed: false, code: "resource_blocked" };
+  const allow = applicable.filter((r) => r.effect === "allow");
+  if (allow.length > 0 && !allow.some((r) => ruleMatches(kind, r.value, value)))
+    return { allowed: false, code: "resource_not_allowed" };
+  return { allowed: true };
+}
+
 export function evaluatePolicy(f: PolicyFacts): PolicyDecision {
   const reasons: Reason[] = [];
   const warnings: Warning[] = [];
@@ -144,15 +167,13 @@ export function evaluatePolicy(f: PolicyFacts): PolicyDecision {
     (r) => r.connectorAccountId === null || r.connectorAccountId === f.connector?.id,
   );
   for (const kind of ["github_repo", "slack_channel", "email_sender"] as const) {
-    const kindRules = applicable.filter((r) => r.kind === kind);
-    const values = f.resources.filter((x) => x.kind === kind);
-    const allow = kindRules.filter((r) => r.effect === "allow");
-    for (const res of values) {
-      if (kindRules.some((r) => r.effect === "block" && ruleMatches(kind, r.value, res.value)))
-        deny("resource_blocked", `${res.value} is blocked by workspace policy.`);
-      // An allowlist, once it exists, is exclusive.
-      else if (allow.length > 0 && !allow.some((r) => ruleMatches(kind, r.value, res.value)))
-        deny("resource_not_allowed", `${res.value} is not in the workspace's allowed list.`);
+    for (const res of f.resources.filter((x) => x.kind === kind)) {
+      const check = checkResource(kind, res.value, applicable, f.connector?.id ?? null);
+      if (!check.allowed) {
+        if (check.code === "resource_blocked")
+          deny("resource_blocked", `${res.value} is blocked by workspace policy.`);
+        else deny("resource_not_allowed", `${res.value} is not in the workspace's allowed list.`);
+      }
     }
   }
 

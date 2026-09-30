@@ -152,6 +152,21 @@ describe("connector lifecycle", () => {
     expect((await listConnectors(owner, ws.id))[0]?.health).toBe("healthy");
   });
 
+  it("flags needs_reauth when a health result reports the credential was rejected", async () => {
+    const { owner, ws, c } = await setup();
+    nextHealth = async () => ({
+      overall: "fail",
+      authFailed: true,
+      steps: [{ id: "credential", label: "Credential validity", status: "fail" }],
+    });
+    await testConnector(owner, c.id);
+    expect((await listConnectors(owner, ws.id))[0]?.health).toBe("needs_reauth");
+    nextHealth = async () => ({
+      overall: "pass",
+      steps: [{ id: "credential", label: "Credential validity", status: "pass" }],
+    });
+  });
+
   it("disconnects: credentials are deleted and listeners are notified", async () => {
     const { owner, ws, c } = await setup();
     const events: string[] = [];
