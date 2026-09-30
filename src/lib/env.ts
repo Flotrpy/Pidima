@@ -19,6 +19,8 @@ const schema = z.object({
   // Transactional email for magic links and notifications.
   SMTP_URL: optional,
   SMTP_FROM: optional,
+  // Bearer secret for the internal scheduled-jobs endpoint (expiry sweep, reconciliation).
+  CRON_SECRET: optional,
   // Connector OAuth apps (what Claude may propose actions for). Separate from sign-in apps.
   CONNECTOR_GITHUB_CLIENT_ID: optional,
   CONNECTOR_GITHUB_CLIENT_SECRET: optional,

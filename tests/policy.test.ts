@@ -195,14 +195,12 @@ describe("policy evaluation against the database", () => {
     });
     expect((await evaluateForProposal("decide", p!, v.args, s.owner)).allowed).toBe(true);
 
-    await getDb()
-      .insert(approvalDecisions)
-      .values({
-        proposalId: p!.id,
-        proposalVersionId: v.id,
-        decision: "approve",
-        decidedByUserId: approver,
-      });
+    await getDb().insert(approvalDecisions).values({
+      proposalId: p!.id,
+      proposalVersionId: v.id,
+      decision: "approve",
+      decidedByUserId: approver,
+    });
     expect((await evaluateForProposal("execute", p!, v.args)).allowed).toBe(true);
     await changeMemberRole(s.owner, s.ws.id, approver, "viewer");
     expect((await evaluateForProposal("execute", p!, v.args)).reasons.map((r) => r.code)).toContain(

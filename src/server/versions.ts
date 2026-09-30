@@ -116,3 +116,17 @@ export const versionStatus = (
   proposal: Pick<ProposalRow, "currentVersion">,
   v: Pick<VersionRow, "version">,
 ): "current" | "superseded" => (v.version === proposal.currentVersion ? "current" : "superseded");
+
+/** Arguments of the proposal's newest version. */
+export async function getLatestArgs(
+  proposalId: string,
+  exec: Executor = getDb(),
+): Promise<Record<string, unknown>> {
+  const [v] = await exec
+    .select()
+    .from(proposalVersions)
+    .where(eq(proposalVersions.proposalId, proposalId))
+    .orderBy(desc(proposalVersions.version))
+    .limit(1);
+  return (v?.args ?? {}) as Record<string, unknown>;
+}
