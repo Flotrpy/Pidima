@@ -49,4 +49,10 @@ export const githubIssue: CapabilityDefinition<GithubIssueArgs> = {
     "A hidden comment identifying this proposal is appended to the body so the system can confirm the issue exists if GitHub's response is lost.",
   ],
   safeSummary: (a) => `Create GitHub issue in ${a.owner}/${a.repo}`,
+  receiptFacts: (a) => [
+    { label: "Repository", value: `${a.owner}/${a.repo}` },
+    { label: "Title", value: a.title },
+    { label: "Labels", value: a.labels.join(", ") || "(none)" },
+    { label: "Body length", value: `${a.body.length} characters` },
+  ],
 };

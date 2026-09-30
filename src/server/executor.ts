@@ -8,6 +8,7 @@ import { getCapability, getRuntime } from "@/connectors/registry";
 import type { ExecutionOutcome } from "@/connectors/types";
 import { hostname } from "node:os";
 import { onProposalApproved } from "./decisions";
+import { backfillMissingReceipts } from "./receipts";
 import {
   claimExecution,
   findUnclaimedApproved,
@@ -230,5 +231,6 @@ export async function runExecutionMaintenance() {
     if (r?.status === "done") dispatched++;
   }
   const reconciled = await reconcileUnknownOutcomes();
-  return { recovered, dispatched, reconciled };
+  const receipts = await backfillMissingReceipts();
+  return { recovered, dispatched, reconciled, receipts };
 }

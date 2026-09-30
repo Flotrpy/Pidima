@@ -33,6 +33,8 @@ export type CapabilityDefinition<Args extends Record<string, unknown> = Record<s
   consequences(args: Args): string[];
   /** Short summary that is safe to send over MCP and notifications (no content). */
   safeSummary(args: Args): string;
+  /** Minimal facts for receipts. Message bodies are deliberately excluded (hashes/lengths only). */
+  receiptFacts(args: Args): { label: string; value: string }[];
 };
 
 export type ExecutionOutcome =

@@ -90,5 +90,16 @@ export const emailMessage: CapabilityDefinition<EmailMessageArgs> = {
     `An email will be sent from ${a.from} to ${new Set([...a.to, ...a.cc, ...a.bcc]).size} recipient(s).`,
     "Email cannot be recalled once accepted by the provider. Acceptance does not prove delivery or that it was read.",
   ],
+  receiptFacts: (a) => [
+    { label: "From", value: a.from },
+    { label: "To", value: a.to.join(", ") },
+    ...(a.cc.length ? [{ label: "CC", value: a.cc.join(", ") }] : []),
+    ...(a.bcc.length ? [{ label: "BCC", value: a.bcc.join(", ") }] : []),
+    { label: "Subject", value: a.subject },
+    {
+      label: "Body length",
+      value: `${(a.textBody ?? "").length + (a.htmlBody ?? "").length} characters`,
+    },
+  ],
   safeSummary: (a) => `Send email to ${new Set([...a.to, ...a.cc, ...a.bcc]).size} recipient(s)`,
 };

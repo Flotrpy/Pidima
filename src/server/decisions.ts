@@ -168,13 +168,7 @@ export async function decideProposal(input: Input): Promise<DecisionResult> {
         );
     }
 
-    const event = input.decision;
-    await applyTransition(
-      p.id,
-      event,
-      { actor: { type: "user", id: input.actorId }, detail: { version: p.currentVersion } },
-      tx,
-    );
+    // The decision row goes in first: the transition writes the receipt, which must see who decided.
     await tx.insert(approvalDecisions).values({
       proposalId: p.id,
       proposalVersionId: version.id,
@@ -182,15 +176,18 @@ export async function decideProposal(input: Input): Promise<DecisionResult> {
       decidedByUserId: input.actorId,
       reason: input.reason?.slice(0, 500) ?? null,
     });
+    await applyTransition(
+      p.id,
+      input.decision,
+      { actor: { type: "user", id: input.actorId }, detail: { version: p.currentVersion } },
+      tx,
+    );
     await recordAudit(
       {
         workspaceId: p.workspaceId,
         actorType: "user",
         actorId: input.actorId,
-        action: `proposal.${input.decision}d`
-          .replace("denyd", "denied")
-          .replace("canceld", "canceled")
-          .replace("approved", "approved"),
+        action: AUDIT_ACTION[input.decision],
         subjectType: "proposal",
         subjectId: p.id,
         correlationId: p.correlationId,

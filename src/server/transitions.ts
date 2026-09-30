@@ -5,6 +5,7 @@ import { proposals } from "@/db/schema";
 import { InvalidTransitionError, nextState, type ProposalEvent } from "@/approvals/state-machine";
 import type { ProposalState } from "@/components/ui/status";
 import { recordAudit, type Executor } from "./audit";
+import { writeReceiptForState } from "./receipts";
 
 export class StaleStateError extends Error {
   constructor() {
@@ -54,6 +55,8 @@ export async function applyTransition(
     },
     exec,
   );
+  // Settling states get their receipt in the same transaction, so a receipt exists iff the state does.
+  if (to !== from) await writeReceiptForState(exec, proposalId, to, from);
   return { from, to };
 }
 
