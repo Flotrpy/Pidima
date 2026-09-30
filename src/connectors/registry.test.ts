@@ -63,7 +63,8 @@ describe("slack message arguments", () => {
     expect(slackMessageArgs.parse({ channel: "C0123456789", text: "hi" }).channel).toBe(
       "C0123456789",
     );
-    expect(() => slackMessageArgs.parse({ channel: "#general", text: "hi" })).toThrow();
+    expect(slackMessageArgs.parse({ channel: "#general", text: "hi" }).channel).toBe("#general");
+    expect(() => slackMessageArgs.parse({ channel: "#General Team", text: "hi" })).toThrow();
     expect(() => slackMessageArgs.parse({ channel: "C0123456789", text: "" })).toThrow();
     expect(() =>
       slackMessageArgs.parse({ channel: "C0123456789", text: "x".repeat(4001) }),

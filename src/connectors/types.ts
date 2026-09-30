@@ -77,7 +77,7 @@ export type RuntimeContext = {
 };
 
 export type ProposalValidation =
-  | { status: "ok" }
+  | { status: "ok"; display?: Record<string, string> }
   | { status: "rejected"; category: ErrorCategory; message: string }
   | { status: "unverified"; reason: string };
 
@@ -107,6 +107,18 @@ export type ConnectorRuntime = {
     capability: Capability,
     args: Record<string, unknown>,
   ): Promise<ProposalValidation>;
+  /**
+   * Turns friendly references the AI supplied (e.g. "#ops") into the canonical identifiers that
+   * policy and execution use (a Slack channel ID). Read-only. Runs BEFORE policy evaluation.
+   */
+  resolveArgs?(
+    ctx: RuntimeContext,
+    capability: Capability,
+    args: Record<string, unknown>,
+  ): Promise<
+    | { status: "ok"; args: Record<string, unknown> }
+    | { status: "rejected"; category: ErrorCategory; message: string }
+  >;
   execute(
     ctx: RuntimeContext,
     capability: Capability,

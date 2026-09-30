@@ -1,0 +1,1 @@
+ALTER TABLE "proposal_versions" ADD COLUMN "display" jsonb DEFAULT '{}'::jsonb NOT NULL;

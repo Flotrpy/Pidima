@@ -50,6 +50,8 @@ export async function insertVersion(
     proposal: ProposalRow;
     version: number;
     args: unknown;
+    /** Server-resolved display facts (e.g. channel name). Informational only. */
+    display?: Record<string, string>;
     author: { type: "ai" } | { type: "human"; userId: string };
   },
 ): Promise<VersionRow> {
@@ -67,6 +69,7 @@ export async function insertVersion(
       argsHash: hashes.argsHash,
       bindingHash: hashes.bindingHash,
       destination,
+      display: input.display ?? {},
       authorType: input.author.type,
       authorUserId: input.author.type === "human" ? input.author.userId : null,
     })

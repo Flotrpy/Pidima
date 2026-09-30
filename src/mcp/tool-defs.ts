@@ -39,7 +39,11 @@ export const TOOL_DEFS: Record<
     description:
       "Propose sending a Slack message. This does NOT send it: it queues the exact message for a human to review, edit, approve or deny. Returns a proposal ID and a review link.",
     shape: {
-      channel: z.string().describe("Slack channel ID, for example C0123456789."),
+      channel: z
+        .string()
+        .describe(
+          "Slack channel name such as #ops (the connected app or account must be a member), or a channel ID such as C0123456789.",
+        ),
       text: z.string().describe("Message text (max 4,000 characters)."),
       thread_ts: z.string().optional().describe("Timestamp of the thread to reply in."),
       ...common,

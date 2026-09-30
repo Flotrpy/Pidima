@@ -57,6 +57,13 @@
       "when": 1790786312368,
       "tag": "0007_oauth_tx_context",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790786876143,
+      "tag": "0008_version_display",
+      "breakpoints": true
     }
   ]
 }

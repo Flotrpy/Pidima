@@ -72,6 +72,11 @@ export function ReviewPanel({
             >
               <dt>{f.label}</dt>
               <dd>
+                {f.warning ? (
+                  <p className="alert alert-warn" role="alert" style={{ margin: "0 0 8px" }}>
+                    <strong>Warning:</strong> {f.warning}
+                  </p>
+                ) : null}
                 {f.kind === "longtext" ? (
                   <LongText label={f.label} value={f.value as string} />
                 ) : Array.isArray(f.value) ? (
@@ -118,6 +123,12 @@ export function ReviewPanel({
               ({d.connector.provider}, {d.connector.status})
             </span>
           </dd>
+          {d.senderNote ? (
+            <>
+              <dt>Appears as</dt>
+              <dd>{d.senderNote}</dd>
+            </>
+          ) : null}
           <dt>Permissions needed</dt>
           <dd>
             {d.requiredScopes.join(", ")}

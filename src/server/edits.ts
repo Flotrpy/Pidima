@@ -11,6 +11,8 @@ import { loadMembership } from "./authz";
 import { evaluateForProposal } from "./policy";
 import { MAX_ARGS_BYTES, expireIfDue } from "./proposals";
 import { applyTransition } from "./transitions";
+import { connectorAccounts } from "@/db/schema";
+import { resolveWithProvider, validateWithProvider } from "./proposal-validation";
 import { getVersion, insertVersion } from "./versions";
 
 export class EditError extends Error {
@@ -71,6 +73,20 @@ export async function editProposal(input: {
     throw e;
   }
 
+  // Resolve friendly references (e.g. "#ops") to canonical IDs BEFORE policy sees the destination.
+  const [connector] = await db
+    .select()
+    .from(connectorAccounts)
+    .where(eq(connectorAccounts.id, p0.connectorAccountId));
+  if (connector) {
+    const resolved = await resolveWithProvider(connector, p0.capability, args);
+    if (!resolved.ok)
+      throw new EditError("policy_denied", resolved.message, {
+        reasons: [{ code: "destination_invalid", message: resolved.message }],
+      });
+    args = resolved.args;
+  }
+
   // The new content (including a changed destination) must satisfy today's policy.
   // Separation of duties governs approving, not editing, so that one rule is set aside here.
   const policy = await evaluateForProposal("decide", p0, args, input.actorId);
@@ -81,6 +97,16 @@ export async function editProposal(input: {
     throw new EditError("policy_denied", "Workspace policy does not allow this change.", {
       reasons: blockers,
     });
+
+  let display: Record<string, string> = {};
+  if (connector) {
+    const v = await validateWithProvider(connector, p0.capability, args);
+    if (v.status === "rejected")
+      throw new EditError("policy_denied", v.message, {
+        reasons: [{ code: "destination_invalid", message: v.message }],
+      });
+    if (v.status === "ok") display = v.display ?? {};
+  }
 
   return db.transaction(async (tx) => {
     const [p] = await tx
@@ -105,6 +131,7 @@ export async function editProposal(input: {
       proposal: p,
       version: next,
       args,
+      display,
       author: { type: "human", userId: input.actorId },
     });
     await applyTransition(

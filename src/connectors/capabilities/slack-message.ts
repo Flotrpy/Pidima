@@ -3,10 +3,14 @@ import { boundedText } from "../text";
 import type { CapabilityDefinition } from "../types";
 
 export const slackMessageArgs = z.object({
+  // A channel ID, or a channel name (with or without #) that the server resolves to an ID.
   channel: z
     .string()
     .trim()
-    .regex(/^[CGD][A-Z0-9]{8,}$/, "Use a Slack channel ID such as C0123456789"),
+    .regex(
+      /^(?:[CGD][A-Z0-9]{8,}|#?[a-z0-9][a-z0-9._-]{0,79})$/,
+      "Use a channel name such as #ops, or a Slack channel ID such as C0123456789",
+    ),
   text: boundedText(4000, { multiline: true }),
   threadTs: z
     .string()
@@ -15,6 +19,18 @@ export const slackMessageArgs = z.object({
     .optional(),
 });
 export type SlackMessageArgs = z.infer<typeof slackMessageArgs>;
+
+/** Text that would notify many people or specific people when posted. Shown to the reviewer as a warning. */
+export function pingWarning(text: string): string | undefined {
+  const broadcast = /<!(?:channel|here|everyone)(?:\|[^>]*)?>|<!subteam\^[A-Z0-9]+[^>]*>/i.test(
+    text,
+  );
+  if (broadcast)
+    return "This message would notify everyone in the channel (@channel, @here or a group).";
+  if (/<@[UW][A-Z0-9]+(?:\|[^>]*)?>/.test(text))
+    return "This message mentions specific people and will notify them.";
+  return undefined;
+}
 
 export const slackMessage: CapabilityDefinition<SlackMessageArgs> = {
   id: "slack.propose_message",
@@ -29,7 +45,7 @@ export const slackMessage: CapabilityDefinition<SlackMessageArgs> = {
   reviewFields: (a) => [
     { label: "Channel", value: a.channel, kind: "text", emphasis: true },
     ...(a.threadTs ? [{ label: "Reply in thread", value: a.threadTs, kind: "text" as const }] : []),
-    { label: "Message", value: a.text, kind: "longtext" },
+    { label: "Message", value: a.text, kind: "longtext", warning: pingWarning(a.text) },
   ],
   consequences: (a) => [
     a.threadTs

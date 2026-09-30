@@ -14,7 +14,7 @@ import type { ProposalState } from "@/components/ui/status";
 import type { ReviewField } from "@/connectors/types";
 import { hasHiddenDirectionControls } from "@/lib/time";
 import { requirePermission } from "./authz";
-import { listConnectors } from "./connectors";
+import { identityNote, listConnectors } from "./connectors";
 import { evaluateForProposal } from "./policy";
 import { expireIfDue } from "./proposals";
 import { WorkspaceError } from "./workspaces";
@@ -219,6 +219,9 @@ export type ProposalDetail = {
     status: string;
   };
   requiredScopes: string[];
+  /** Who/what the action will appear to come from (e.g. Slack app vs. a person). */
+  senderNote: string | null;
+  display: Record<string, string>;
   hiddenDirectionWarning: boolean;
   args: Record<string, unknown>;
   /** The AI's first version, kept so reviewers and receipts can see what a person changed. */
@@ -286,7 +289,15 @@ export async function getProposalDetail(
   // Live policy view for this reader: warnings to show, and blockers explaining why deciding may be impossible.
   const policy =
     p.state === "PENDING_APPROVAL" ? await evaluateForProposal("decide", p, args, actorId) : null;
-  const fields = def.reviewFields(args as never);
+  const display = (current.display ?? {}) as Record<string, string>;
+  // Show the resolved, human-friendly name next to the canonical ID the system will actually use.
+  const fields = def
+    .reviewFields(args as never)
+    .map((f) =>
+      f.label === "Channel" && display.channelName
+        ? { ...f, value: `${display.channelName} (${String(f.value)})` }
+        : f,
+    );
   const flat = fields.flatMap((f) => (Array.isArray(f.value) ? f.value : [f.value]));
 
   return {
@@ -309,7 +320,9 @@ export async function getProposalDetail(
       createdAt: v.createdAt,
       status: v.version === p.currentVersion ? "current" : "superseded",
     })),
-    destination: current.destination,
+    destination: display.channelName
+      ? `${display.channelName}${display.workspace ? ` · ${display.workspace}` : ""}`
+      : current.destination,
     fields,
     consequences: def.consequences(args as never),
     warnings: policy?.warnings.map((w) => ({ code: w.code, message: w.message })) ?? [],
@@ -322,6 +335,8 @@ export async function getProposalDetail(
       status: conn?.status ?? "disconnected",
     },
     requiredScopes: def.requiredScopes,
+    senderNote: conn ? identityNote(conn.provider, conn.metadata) : null,
+    display,
     hiddenDirectionWarning: hasHiddenDirectionControls(...flat),
     args,
     originalArgs: (versions.find((x) => x.v.version === 1)?.v.args ?? args) as Record<

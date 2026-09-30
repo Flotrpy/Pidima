@@ -9,7 +9,7 @@ import { getEnv } from "@/lib/env";
 import type { Capability } from "@/lib/permissions";
 import { recordAudit } from "./audit";
 import { evaluateForPropose } from "./policy";
-import { validateWithProvider } from "./proposal-validation";
+import { resolveWithProvider, validateWithProvider } from "./proposal-validation";
 import { applyTransition } from "./transitions";
 import { getLatestArgs, insertVersion } from "./versions";
 
@@ -160,6 +160,14 @@ export async function createProposal(input: {
     input.capability,
     input.connectorAccountId,
   );
+  // Resolve friendly references first, so policy evaluates the real destination.
+  const resolved = await resolveWithProvider(connector, input.capability, args);
+  if (!resolved.ok)
+    throw new ProposalError("destination_invalid", resolved.message, {
+      category: resolved.category,
+    });
+  args = resolved.args;
+
   const policy = await evaluateForPropose({
     workspaceId: principal.workspaceId,
     capability: input.capability,
@@ -179,6 +187,7 @@ export async function createProposal(input: {
     throw new ProposalError("destination_invalid", provider.message, {
       category: provider.category,
     });
+  const display = provider.status === "ok" ? (provider.display ?? {}) : {};
 
   const expiresAt = new Date(Date.now() + policy.expirySeconds * 1000);
   const correlationId = randomUUID();
@@ -203,7 +212,7 @@ export async function createProposal(input: {
       .returning();
     if (inserted.length === 0) return null; // lost an idempotency race
     const proposal = inserted[0]!;
-    await insertVersion(tx, { proposal, version: 1, args, author: { type: "ai" } });
+    await insertVersion(tx, { proposal, version: 1, args, display, author: { type: "ai" } });
     await applyTransition(
       proposal.id,
       "submit",

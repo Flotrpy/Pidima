@@ -3,6 +3,7 @@ import type {
   ConnectorRuntime,
   HealthStepResult,
   HealthTestResult,
+  ProposalValidation,
   RuntimeContext,
 } from "../types";
 import { SlackClient } from "./client";
@@ -192,9 +193,111 @@ export async function slackHealthTest(ctx: RuntimeContext): Promise<HealthTestRe
   };
 }
 
+const CHANNEL_ID = /^[CGD][A-Z0-9]{8,}$/;
+
+/** Resolves "#ops" to a channel ID among channels this connection can see. No enumeration on failure. */
+export async function slackResolveArgs(
+  ctx: RuntimeContext,
+  args: Record<string, unknown>,
+): Promise<
+  | { status: "ok"; args: Record<string, unknown> }
+  | {
+      status: "rejected";
+      category: "destination_inaccessible" | "auth_expired" | "provider_unavailable";
+      message: string;
+    }
+> {
+  const raw = String(args.channel ?? "");
+  if (CHANNEL_ID.test(raw)) return { status: "ok", args };
+  const name = raw.replace(/^#/, "").toLowerCase();
+  try {
+    const client = new SlackClient(ctx.fetch, await ctx.getAccessToken());
+    const { channels } = await client.listChannels();
+    const matches = channels.filter(
+      (c) => c.name.toLowerCase() === name && !c.isArchived && c.isMember,
+    );
+    if (matches.length === 1) return { status: "ok", args: { ...args, channel: matches[0]!.id } };
+    return {
+      status: "rejected",
+      category: "destination_inaccessible",
+      message: `No channel named #${name} is available to this connection. Invite the app to the channel, or use the channel's ID.`,
+    };
+  } catch (e) {
+    if (e instanceof ConnectorError && e.category === "auth_expired")
+      return {
+        status: "rejected",
+        category: "auth_expired",
+        message: "The Slack connection needs to be reconnected.",
+      };
+    return {
+      status: "rejected",
+      category: "provider_unavailable",
+      message: `Slack could not resolve #${name} right now. Try again, or use the channel's ID.`,
+    };
+  }
+}
+
+/** Read-only checks for a proposed message: real channel, not archived, and this sender can post there. */
+export async function slackValidateProposal(
+  ctx: RuntimeContext,
+  args: Record<string, unknown>,
+): Promise<ProposalValidation> {
+  let token: string;
+  try {
+    token = await ctx.getAccessToken();
+  } catch {
+    return { status: "unverified", reason: "credential_unavailable" };
+  }
+  const channelId = String(args.channel);
+  try {
+    const ch = await new SlackClient(ctx.fetch, token).getChannel(channelId);
+    if (ch.isArchived)
+      return {
+        status: "rejected",
+        category: "destination_inaccessible",
+        message: `#${ch.name} is archived and cannot receive messages.`,
+      };
+    if (!ch.isMember) {
+      const who = ctx.account.metadata.senderMode === "user" ? "You are" : "The app is";
+      return {
+        status: "rejected",
+        category: "destination_inaccessible",
+        message: `${who} not a member of #${ch.name}. ${ctx.account.metadata.senderMode === "user" ? "Join the channel first." : "Invite the app with /invite in that channel."}`,
+      };
+    }
+    return {
+      status: "ok",
+      display: {
+        channelName: `${ch.isPrivate ? "🔒 " : "#"}${ch.name}`,
+        channelPrivacy: ch.isPrivate ? "private" : "public",
+        workspace: String(ctx.account.metadata.teamName ?? ""),
+      },
+    };
+  } catch (e) {
+    if (e instanceof ConnectorError) {
+      if (e.category === "destination_inaccessible")
+        return {
+          status: "rejected",
+          category: e.category,
+          message: "That Slack channel was not found, or this connection cannot see it.",
+        };
+      if (e.category === "auth_expired")
+        return {
+          status: "rejected",
+          category: e.category,
+          message: "The Slack connection needs to be reconnected.",
+        };
+      return { status: "unverified", reason: e.category };
+    }
+    return { status: "unverified", reason: "unexpected_error" };
+  }
+}
+
 export const slackRuntime: ConnectorRuntime = {
   provider: "slack",
   healthTest: slackHealthTest,
+  resolveArgs: (ctx, _capability, args) => slackResolveArgs(ctx, args),
+  validateProposal: (ctx, _capability, args) => slackValidateProposal(ctx, args),
   async execute() {
     // Message sending is implemented in P1-049.
     throw new ConnectorError("failed_before_dispatch", "Slack execution is not available yet");

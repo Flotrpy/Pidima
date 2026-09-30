@@ -242,7 +242,7 @@ export type ConnectorView = {
   } | null;
 };
 
-function identityNote(provider: Provider, m: Record<string, unknown>): string | null {
+export function identityNote(provider: Provider, m: Record<string, unknown>): string | null {
   if (provider === "slack") {
     return m.senderMode === "user"
       ? `Messages appear as ${String(m.userName ?? "you")}, from a personal Slack account.`

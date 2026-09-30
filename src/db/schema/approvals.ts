@@ -77,6 +77,8 @@ export const proposalVersions = pgTable(
     /** Hash binding args + connector + capability + workspace + client + expiry. */
     bindingHash: text("binding_hash").notNull(),
     destination: text("destination").notNull(),
+    /** Server-resolved, human-friendly facts (e.g. a Slack channel name). Informational; not part of the binding hash. */
+    display: jsonb("display").$type<Record<string, string>>().notNull().default({}),
     authorType: text("author_type", { enum: ["ai", "human"] }).notNull(),
     authorUserId: text("author_user_id").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
