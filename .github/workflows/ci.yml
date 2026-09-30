@@ -28,3 +28,5 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+        env:
+          BETTER_AUTH_SECRET: ci-build-secret-ci-build-secret-ci-1234
