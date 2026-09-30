@@ -29,6 +29,13 @@
       "when": 1790779957876,
       "tag": "0003_membership_approval_scope",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790780426289,
+      "tag": "0004_oauth_tx_no_verifier_storage",
+      "breakpoints": true
     }
   ]
 }

@@ -34,15 +34,13 @@ describe("onboarding routing", () => {
   it("derives provider completion from a real active connector", async () => {
     const id = await user("n2@example.test");
     const ws = await createWorkspace(id, "Connected");
-    await getDb()
-      .insert(connectorAccounts)
-      .values({
-        workspaceId: ws.id,
-        provider: "github",
-        externalAccountId: "1",
-        displayName: "gh",
-        connectedByUserId: id,
-      });
+    await getDb().insert(connectorAccounts).values({
+      workspaceId: ws.id,
+      provider: "github",
+      externalAccountId: "1",
+      displayName: "gh",
+      connectedByUserId: id,
+    });
     const s = await getOnboardingState(ws.id);
     expect(s.steps[1]?.status).toBe("done");
     expect(s.current).toBe("claude");

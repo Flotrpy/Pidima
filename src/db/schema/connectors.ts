@@ -78,10 +78,6 @@ export const oauthTransactions = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     redirectUri: text("redirect_uri").notNull(),
     returnTo: text("return_to").notNull(),
-    /** PKCE verifier, encrypted with the credential vault. */
-    codeVerifierNonce: bytea("code_verifier_nonce"),
-    codeVerifierCiphertext: bytea("code_verifier_ciphertext"),
-    keyVersion: integer("key_version"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
