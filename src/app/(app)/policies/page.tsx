@@ -41,6 +41,8 @@ export default async function PoliciesPage() {
   const repoRules = rules.filter((r) => r.kind === "github_repo");
   const slack = connectors.filter((c) => c.provider === "slack" && c.status === "active");
   const channelRules = rules.filter((r) => r.kind === "slack_channel");
+  const gmail = connectors.filter((c) => c.provider === "gmail" && c.status === "active");
+  const mailRules = rules.filter((r) => r.kind === "email_domain" || r.kind === "email_sender");
 
   return (
     <div className="stack" style={{ ["--gap" as string]: "28px" }}>
@@ -194,6 +196,79 @@ export default async function PoliciesPage() {
             <ChannelPicker connectorId={c.id} name={c.displayName} />
           </Suspense>
         ))}
+      </section>
+
+      <section className="stack" aria-labelledby="em-h">
+        <h2 id="em-h" style={{ fontSize: "1.15rem" }}>
+          Email senders and recipient domains
+        </h2>
+        <p className="muted">
+          Emails are sent only from connected addresses. Recipients outside the sender&apos;s own
+          domain always get a warning. Add a <strong>Warn</strong> rule to flag a domain,{" "}
+          <strong>Block</strong> to refuse it, or <strong>Allow</strong> to mark it as trusted (no
+          warning). Use <code>*.example.com</code> for subdomains.
+        </p>
+        {mailRules.length > 0 ? (
+          <ul className="card plain-list" aria-label="Email rules">
+            {mailRules.map((r) => (
+              <li key={r.id} className="row list-row">
+                <span
+                  className={`badge ${r.effect === "allow" ? "badge-success" : r.effect === "warn" ? "badge-pending" : "badge-failure"}`}
+                >
+                  <span aria-hidden="true">
+                    {r.effect === "allow" ? "✓" : r.effect === "warn" ? "!" : "⊘"}
+                  </span>
+                  <span>
+                    {r.effect === "allow" ? "Allow" : r.effect === "warn" ? "Warn" : "Block"}
+                  </span>
+                </span>
+                <span className="muted">{r.kind === "email_sender" ? "sender" : "domain"}</span>
+                <span className="mono" style={{ flex: 1 }}>
+                  {r.value}
+                </span>
+                <form action={removeRuleAction}>
+                  <input type="hidden" name="ruleId" value={r.id} />
+                  <Button
+                    type="submit"
+                    small
+                    variant="danger"
+                    aria-label={`Remove rule for ${r.value}`}
+                  >
+                    Remove
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="alert" role="status">
+            No email rules: any connected sender may email any domain, with external-domain
+            warnings.
+          </p>
+        )}
+        <div className="card stack">
+          <h3 style={{ fontSize: "1rem", margin: 0 }}>Recipient domain</h3>
+          <RuleForm
+            kind="email_domain"
+            placeholder="partner.com or *.partner.com"
+            hint="Domains are matched exactly, or with *. for subdomains."
+            effects={["warn", "block", "allow"]}
+            connectors={gmail.map((c) => ({ id: c.id, name: c.displayName }))}
+          />
+        </div>
+        <div className="card stack">
+          <h3 style={{ fontSize: "1rem", margin: 0 }}>Allowed sender address</h3>
+          <RuleForm
+            kind="email_sender"
+            placeholder="maya@acme.com"
+            hint="Once any sender is allowed, only allowed senders can be used."
+            effects={["allow", "block"]}
+            connectors={gmail.map((c) => ({ id: c.id, name: c.displayName }))}
+          />
+        </div>
+        {gmail.length === 0 ? (
+          <p className="muted">Connect email on the Connections page first.</p>
+        ) : null}
       </section>
     </div>
   );
