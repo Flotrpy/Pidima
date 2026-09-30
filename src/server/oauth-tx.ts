@@ -40,6 +40,7 @@ export async function beginOAuth(input: {
   workspaceId: string;
   provider: OAuthProvider;
   returnTo?: string | null;
+  context?: Record<string, string>;
 }) {
   await requirePermission(input.userId, input.workspaceId, "connectors.manage");
   const state = randomToken(32);
@@ -53,6 +54,7 @@ export async function beginOAuth(input: {
       workspaceId: input.workspaceId,
       redirectUri,
       returnTo: safeReturnTo(input.returnTo, "/connections"),
+      context: input.context ?? {},
       expiresAt: new Date(Date.now() + OAUTH_TX_TTL_MS),
     });
   return {
@@ -93,6 +95,7 @@ export async function consumeOAuth(input: {
     workspaceId: tx.workspaceId,
     redirectUri: tx.redirectUri,
     returnTo: safeReturnTo(tx.returnTo, "/connections"),
+    context: tx.context,
     codeVerifier: codeVerifierFor(input.state),
   };
 }

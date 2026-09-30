@@ -231,6 +231,8 @@ export type ConnectorView = {
   /** "degraded" = credentials not known-bad, but the latest test failed. */
   health: "healthy" | "degraded" | "needs_reauth" | "disconnected" | "untested";
   grantedScopes: string[];
+  /** Plain-language note about who/what this connection acts as. Derived from non-secret metadata. */
+  identityNote: string | null;
   lastTestedAt: Date | null;
   lastSuccessfulTestAt: Date | null;
   latestTest: {
@@ -239,6 +241,19 @@ export type ConnectorView = {
     at: Date;
   } | null;
 };
+
+function identityNote(provider: Provider, m: Record<string, unknown>): string | null {
+  if (provider === "slack") {
+    return m.senderMode === "user"
+      ? `Messages appear as ${String(m.userName ?? "you")}, from a personal Slack account.`
+      : "Messages appear from the app (bot), not from a person.";
+  }
+  if (provider === "github")
+    return m.accessLevel === "public_only"
+      ? "Public repositories only."
+      : "Public and private repositories.";
+  return null;
+}
 
 /** Safe view: never includes credentials or raw metadata. */
 export async function listConnectors(
@@ -275,6 +290,7 @@ export async function listConnectors(
       status: a.status,
       health,
       grantedScopes: a.grantedScopes,
+      identityNote: identityNote(a.provider, a.metadata),
       lastTestedAt: a.lastTestedAt,
       lastSuccessfulTestAt: a.lastSuccessfulTestAt,
       latestTest: t ? { overall: t.overall, steps: t.steps, at: t.finishedAt } : null,

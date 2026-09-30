@@ -1,0 +1,1 @@
+ALTER TABLE "oauth_transactions" ADD COLUMN "context" jsonb DEFAULT '{}'::jsonb NOT NULL;

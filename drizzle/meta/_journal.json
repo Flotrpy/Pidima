@@ -50,6 +50,13 @@
       "when": 1790781572281,
       "tag": "0006_proposal_state_guard_edit_keeps_pending",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790786312368,
+      "tag": "0007_oauth_tx_context",
+      "breakpoints": true
     }
   ]
 }

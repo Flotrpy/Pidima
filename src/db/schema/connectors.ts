@@ -78,6 +78,8 @@ export const oauthTransactions = pgTable(
       .references(() => workspaces.id, { onDelete: "cascade" }),
     redirectUri: text("redirect_uri").notNull(),
     returnTo: text("return_to").notNull(),
+    /** Provider-specific facts chosen at start (e.g. Slack sender mode). Server-side only, so the browser cannot alter them. */
+    context: jsonb("context").$type<Record<string, string>>().notNull().default({}),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     consumedAt: timestamp("consumed_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

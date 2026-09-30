@@ -94,6 +94,22 @@ function ConnectLinks({
       </div>
     );
   }
+  if (provider === "slack") {
+    return (
+      <div className="row">
+        <ButtonLink
+          href={`${base}?sender=bot`}
+          variant={!hasAccounts && !reconnect ? "primary" : "secondary"}
+          small
+        >
+          {reconnect ? "Reconnect as app" : "Connect as the app (bot)"}
+        </ButtonLink>
+        <ButtonLink href={`${base}?sender=user`} small>
+          {reconnect ? "Reconnect as me" : "Send as me"}
+        </ButtonLink>
+      </div>
+    );
+  }
   return (
     <ButtonLink href={base} variant={!hasAccounts && !reconnect ? "primary" : "secondary"} small>
       {reconnect ? "Reconnect" : hasAccounts ? "Add another account" : `Connect ${name}`}
@@ -180,6 +196,12 @@ export default async function ConnectionsPage({
                     {h.help}
                   </p>
                   <dl className="facts">
+                    {a.identityNote ? (
+                      <>
+                        <dt>Acts as</dt>
+                        <dd>{a.identityNote}</dd>
+                      </>
+                    ) : null}
                     <dt>Granted permissions</dt>
                     <dd>{a.grantedScopes.length ? a.grantedScopes.join(", ") : "None recorded"}</dd>
                     <dt>Last successful test</dt>
