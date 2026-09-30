@@ -779,3 +779,15 @@ body:has(dialog[open]) {
     box-shadow: 0 -6px 16px rgba(15, 23, 42, 0.06);
   }
 }
+
+/* Receipt */
+.receipt {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 820px;
+}
+.receipt .facts dd {
+  overflow-wrap: anywhere;
+}
