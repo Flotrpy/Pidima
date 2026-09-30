@@ -1,6 +1,14 @@
 export type Role = "owner" | "approver" | "member" | "viewer";
 export type Capability = "github.propose_issue" | "slack.propose_message" | "email.propose_message";
 
+export const CAPABILITIES: readonly Capability[] = [
+  "github.propose_issue",
+  "slack.propose_message",
+  "email.propose_message",
+];
+export const isCapability = (v: unknown): v is Capability =>
+  typeof v === "string" && (CAPABILITIES as readonly string[]).includes(v);
+
 export type Permission =
   | "workspace.manage"
   | "members.manage"
