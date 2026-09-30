@@ -21,5 +21,6 @@ export default defineConfig({
     },
     alias: { "server-only": path.resolve(__dirname, "tests/server-only-stub.ts") },
     fileParallelism: false,
+    setupFiles: ["tests/setup.ts"],
   },
 });

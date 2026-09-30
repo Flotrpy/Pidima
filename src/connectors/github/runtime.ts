@@ -3,6 +3,7 @@ import type {
   ConnectorRuntime,
   HealthStepResult,
   HealthTestResult,
+  ProposalValidation,
   RuntimeContext,
 } from "../types";
 import { GithubClient } from "./client";
@@ -168,9 +169,73 @@ export async function githubHealthTest(ctx: RuntimeContext): Promise<HealthTestR
   };
 }
 
+/** Read-only destination and permission checks for a proposed issue. Creates nothing. */
+export async function githubValidateProposal(
+  ctx: RuntimeContext,
+  args: Record<string, unknown>,
+): Promise<ProposalValidation> {
+  const owner = String(args.owner);
+  const repo = String(args.repo);
+  const labels = Array.isArray(args.labels) ? (args.labels as string[]) : [];
+  let token: string;
+  try {
+    token = await ctx.getAccessToken();
+  } catch {
+    // A local credential problem is not proof the destination is bad; execution re-checks strictly.
+    return { status: "unverified", reason: "credential_unavailable" };
+  }
+  try {
+    const gh = new GithubClient(ctx.fetch, token);
+    const r = await gh.getRepo(owner, repo);
+    if (r.archived)
+      return {
+        status: "rejected",
+        category: "destination_inaccessible",
+        message: `${r.fullName} is archived and cannot receive new issues.`,
+      };
+    if (r.disabled || !r.hasIssues)
+      return {
+        status: "rejected",
+        category: "destination_inaccessible",
+        message: `Issues are disabled on ${r.fullName}.`,
+      };
+    if (r.private && !ctx.account.grantedScopes.includes("repo"))
+      return {
+        status: "rejected",
+        category: "scope_missing",
+        message: `${r.fullName} is private, but the connected GitHub account only has access to public repositories.`,
+      };
+    if (labels.length > 0 && !r.canLabel)
+      return {
+        status: "rejected",
+        category: "scope_missing",
+        message: `The connected GitHub identity cannot apply labels on ${r.fullName} (triage access is required). Propose the issue without labels.`,
+      };
+    return { status: "ok" };
+  } catch (e) {
+    if (e instanceof ConnectorError) {
+      if (e.category === "destination_inaccessible")
+        return {
+          status: "rejected",
+          category: e.category,
+          message: `${owner}/${repo} was not found, or the connected GitHub account cannot see it.`,
+        };
+      if (e.category === "auth_expired")
+        return {
+          status: "rejected",
+          category: e.category,
+          message: "The GitHub connection needs to be reconnected.",
+        };
+      return { status: "unverified", reason: e.category };
+    }
+    return { status: "unverified", reason: "unexpected_error" };
+  }
+}
+
 export const githubRuntime: ConnectorRuntime = {
   provider: "github",
   healthTest: githubHealthTest,
+  validateProposal: (ctx, _capability, args) => githubValidateProposal(ctx, args),
   async execute() {
     // Issue creation is implemented in P1-042.
     throw new ConnectorError("failed_before_dispatch", "GitHub execution is not available yet");

@@ -208,6 +208,23 @@ const tooLarge = (write: boolean) =>
     ? new ConnectorError("verification_required", "Provider response exceeded the size limit", true)
     : new ConnectorError("provider_rejected", "Provider response exceeded the size limit");
 
+const testOverrides = new Map<Provider, SafeFetch>();
+
+/**
+ * Test seam: lets tests substitute a fixture transport per provider so unit tests never touch the
+ * network. Ignored (and cannot be set) outside NODE_ENV=test.
+ */
+export function setTransportOverride(provider: Provider, sf: SafeFetch | null) {
+  if (process.env.NODE_ENV !== "test")
+    throw new Error("Transport overrides are only available in tests");
+  if (sf) testOverrides.set(provider, sf);
+  else testOverrides.delete(provider);
+}
+
 export function safeFetchFor(provider: Provider, extra: Partial<Options> = {}): SafeFetch {
+  if (process.env.NODE_ENV === "test" && !extra.fetchImpl) {
+    const o = testOverrides.get(provider);
+    if (o) return o;
+  }
   return createSafeFetch({ allowedOrigins: PROVIDER_ORIGINS[provider], ...extra });
 }

@@ -12,6 +12,8 @@ export type RepoInfo = {
   disabled: boolean;
   hasIssues: boolean;
   canCreateIssues: boolean;
+  /** Applying labels needs triage (or higher) access; GitHub silently drops labels otherwise. */
+  canLabel: boolean;
 };
 
 type RawRepo = {
@@ -48,6 +50,12 @@ function toRepo(r: RawRepo): RepoInfo | null {
     hasIssues: r.has_issues !== false,
     // Any read access can open an issue on a public repo; GitHub enforces the real rule at write time.
     canCreateIssues: !!(r.permissions?.pull ?? true),
+    canLabel: !!(
+      r.permissions?.triage ||
+      r.permissions?.push ||
+      r.permissions?.maintain ||
+      r.permissions?.admin
+    ),
   };
 }
 

@@ -74,6 +74,11 @@ export type RuntimeContext = {
   fetch: SafeFetch;
 };
 
+export type ProposalValidation =
+  | { status: "ok" }
+  | { status: "rejected"; category: ErrorCategory; message: string }
+  | { status: "unverified"; reason: string };
+
 export type RefreshableCredentials = {
   accessToken: string;
   refreshToken?: string;
@@ -90,6 +95,16 @@ export type ConnectorRuntime = {
     current: RefreshableCredentials,
   ): Promise<{ credentials: RefreshableCredentials; expiresAt: Date | null }>;
   healthTest(ctx: RuntimeContext): Promise<HealthTestResult>;
+  /**
+   * Read-only pre-flight for a proposal: is the destination real and usable, and is this identity
+   * allowed to do what is asked? Must never write. Definitive problems are `rejected`; provider
+   * outages are `unverified` so they do not block proposing.
+   */
+  validateProposal?(
+    ctx: RuntimeContext,
+    capability: Capability,
+    args: Record<string, unknown>,
+  ): Promise<ProposalValidation>;
   execute(
     ctx: RuntimeContext,
     capability: Capability,

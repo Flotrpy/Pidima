@@ -9,10 +9,12 @@ import { getEnv } from "@/lib/env";
 import type { Capability } from "@/lib/permissions";
 import { recordAudit } from "./audit";
 import { evaluateForPropose } from "./policy";
+import { validateWithProvider } from "./proposal-validation";
 import { applyTransition } from "./transitions";
 import { getLatestArgs, insertVersion } from "./versions";
 
 export type ProposalErrorCode =
+  | "destination_invalid"
   | "invalid_arguments"
   | "policy_denied"
   | "connector_required"
@@ -170,6 +172,14 @@ export async function createProposal(input: {
       reasons: policy.reasons,
     });
 
+  // Read-only provider pre-flight: reject destinations that are provably unusable. Provider outages
+  // do not block proposing (execution re-validates anyway).
+  const provider = await validateWithProvider(connector, input.capability, args);
+  if (provider.status === "rejected")
+    throw new ProposalError("destination_invalid", provider.message, {
+      category: provider.category,
+    });
+
   const expiresAt = new Date(Date.now() + policy.expirySeconds * 1000);
   const correlationId = randomUUID();
 
@@ -213,6 +223,7 @@ export async function createProposal(input: {
           capability: input.capability,
           destination: def.destination(args as never),
           warnings: policy.warnings.map((w) => w.code),
+          destination_check: provider.status,
         },
       },
       tx,

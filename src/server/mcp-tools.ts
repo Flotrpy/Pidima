@@ -101,6 +101,8 @@ export async function callProposeTool(
           `Workspace policy does not allow this: ${(e.details.reasons as { message: string }[]).map((r) => r.message).join(" ")}`,
           { code: e.code },
         );
+      if (e.code === "destination_invalid")
+        return fail(`${e.message} Nothing was proposed.`, { code: e.code });
       if (e.code === "connector_ambiguous")
         return fail(`${e.message} Options: ${JSON.stringify(e.details.accounts)}`, {
           code: e.code,

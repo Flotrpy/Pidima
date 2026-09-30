@@ -171,7 +171,7 @@ describe("review detail", () => {
       provider: "github",
       status: "active",
     });
-    expect(d.requiredScopes).toEqual(["repo"]);
+    expect(d.requiredScopes).toEqual(["public_repo"]);
     expect(d.fields.find((f) => f.label === "Repository")).toMatchObject({
       value: "acme/platform",
       emphasis: true,

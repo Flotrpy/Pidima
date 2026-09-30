@@ -32,7 +32,8 @@ export const githubIssue: CapabilityDefinition<GithubIssueArgs> = {
   provider: "github",
   title: "GitHub issue",
   verb: "create a GitHub issue",
-  requiredScopes: ["repo"],
+  // Minimum needed. A broader `repo` grant also satisfies it (see scopesSatisfied).
+  requiredScopes: ["public_repo"],
   argsSchema: githubIssueArgs,
   destination: (a) => `${a.owner}/${a.repo}`,
   resources: (a) => [{ kind: "github_repo", value: `${a.owner}/${a.repo}` }],
