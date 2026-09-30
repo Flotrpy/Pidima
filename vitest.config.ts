@@ -16,6 +16,8 @@ export default defineConfig({
       CRON_SECRET: "cron-secret-cron-secret-cron-secret-0001",
       CONNECTOR_GITHUB_CLIENT_ID: "gh-client-id",
       CONNECTOR_GITHUB_CLIENT_SECRET: "gh-client-secret",
+      CONNECTOR_GOOGLE_CLIENT_ID: "g-client-id",
+      CONNECTOR_GOOGLE_CLIENT_SECRET: "g-client-secret",
       CONNECTOR_SLACK_CLIENT_ID: "slack-client-id",
       CONNECTOR_SLACK_CLIENT_SECRET: "slack-client-secret",
       SMTP_URL: "smtp://unused.test",
