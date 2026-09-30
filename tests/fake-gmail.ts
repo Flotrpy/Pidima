@@ -45,6 +45,7 @@ export function fakeGmail(opts: FakeGmailOptions = {}) {
           st,
         );
 
+    if (url.pathname === "/oauth2/v3/certs") return json({ keys: [] });
     if (url.pathname === "/token") {
       const form = new URLSearchParams(String(init?.body));
       if (
