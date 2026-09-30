@@ -1,13 +1,9 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { getDb } from "@/db/client";
-import { mcpClients, mcpGrants } from "@/db/schema";
 import { toProposalArgs } from "@/mcp/tool-defs";
 import type { McpPrincipal } from "@/mcp/server";
 import type { Capability } from "@/lib/permissions";
-import { can } from "@/lib/permissions";
-import { loadMembership } from "./authz";
+import { verifyGrantForCall } from "./mcp-grant";
 import { availableCapabilities } from "./policy";
 import { ProposalError, createProposal } from "./proposals";
 import { logEvent } from "./log";
@@ -34,34 +30,10 @@ export async function callProposeTool(
   const correlationId = randomUUID();
   const started = Date.now();
   try {
-    const [row] = await getDb()
-      .select({ grant: mcpGrants, clientId: mcpClients.clientId, clientName: mcpClients.name })
-      .from(mcpGrants)
-      .innerJoin(mcpClients, eq(mcpClients.id, mcpGrants.mcpClientId))
-      .where(eq(mcpGrants.id, principal.grantId));
-
-    // 1. Grant must exist, be live, belong to the token's client, and match the workspace we were built for.
-    if (
-      !row ||
-      row.grant.revokedAt ||
-      row.grant.workspaceId !== principal.workspaceId ||
-      row.grant.userId !== principal.userId
-    ) {
-      return fail(
-        "This AI client authorization is no longer valid. Reconnect it in AI Action Inbox.",
-      );
-    }
-    if (authClientId && authClientId !== row.clientId)
-      return fail(
-        "This AI client authorization is no longer valid. Reconnect it in AI Action Inbox.",
-      );
-    // 2. Scope.
-    if (!row.grant.scopes.includes("proposals:create"))
-      return fail("This AI client was not authorized to propose actions.");
-    // 3. The authorizing user must still be allowed to connect clients in this workspace.
-    const m = await loadMembership(row.grant.userId, row.grant.workspaceId);
-    if (!m || !can(m.role, "clients.connect"))
-      return fail("The person who authorized this client no longer has access.");
+    // 1-3. Grant, workspace, client, scope and the authorizing user's live rights.
+    const g = await verifyGrantForCall(principal, "proposals:create", authClientId);
+    if (!g.ok) return fail(g.text);
+    const row = { grant: g.v.grant, clientName: g.v.clientName };
     // 4. Capability must currently be offered (policy + connector), independent of what tools/list showed earlier.
     if (!(await availableCapabilities(row.grant.id)).includes(capability)) {
       return fail(

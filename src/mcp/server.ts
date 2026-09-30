@@ -2,6 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Capability } from "@/lib/permissions";
 import { availableCapabilities } from "@/server/policy";
 import { callProposeTool } from "@/server/mcp-tools";
+import { getStatusTool, listRecentTool } from "@/server/mcp-status";
+import { z } from "zod";
 import { TOOL_DEFS } from "./tool-defs";
 
 export const MCP_SERVER_INFO = { name: "ai-action-inbox", version: "0.1.0" } as const;
@@ -62,7 +64,76 @@ export async function createMcpServer(principal: McpPrincipal): Promise<McpServe
       },
     );
   }
-  if (available.length === 0) {
+  if (principal.scopes.includes("proposals:read")) {
+    const ro = {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    };
+    server.registerTool(
+      "action.get_status",
+      {
+        title: "Get proposal status",
+        description:
+          "Check what happened to a proposal you created: waiting for review, approved, completed, failed, denied, expired, or outcome unknown. Returns no content, only status.",
+        inputSchema: {
+          proposal_id: z
+            .string()
+            .describe("The proposal ID returned when you proposed the action."),
+        },
+        annotations: ro,
+      },
+      async (input, extra) => {
+        const r = await getStatusTool(principal, input, extra.authInfo?.clientId);
+        return {
+          isError: r.isError,
+          content: [{ type: "text" as const, text: r.text }],
+          ...(r.structured ? { structuredContent: r.structured } : {}),
+        };
+      },
+    );
+    server.registerTool(
+      "action.list_recent",
+      {
+        title: "List recent proposals",
+        description:
+          "List proposals this client recently created, newest first, with their current state. Returns no content, only summaries.",
+        inputSchema: {
+          limit: z
+            .number()
+            .int()
+            .min(1)
+            .max(20)
+            .optional()
+            .describe("How many to return (default 10, max 20)."),
+          state: z
+            .enum([
+              "PENDING_APPROVAL",
+              "APPROVED",
+              "EXECUTING",
+              "SUCCEEDED",
+              "FAILED",
+              "OUTCOME_UNKNOWN",
+              "DENIED",
+              "CANCELED",
+              "EXPIRED",
+            ])
+            .optional(),
+        },
+        annotations: ro,
+      },
+      async (input, extra) => {
+        const r = await listRecentTool(principal, input, extra.authInfo?.clientId);
+        return {
+          isError: r.isError,
+          content: [{ type: "text" as const, text: r.text }],
+          ...(r.structured ? { structuredContent: r.structured } : {}),
+        };
+      },
+    );
+  }
+  if (available.length === 0 && !principal.scopes.includes("proposals:read")) {
     // With no tools registered the SDK would answer tools/list with "method not found".
     // Install its tool handlers anyway so an empty list is returned (honest: nothing is offered).
     (server as unknown as { setToolRequestHandlers(): void }).setToolRequestHandlers();

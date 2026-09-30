@@ -160,14 +160,12 @@ describe("atomic execution claim", () => {
     await s.approve();
     const c = (await claimExecution(s.id, "a"))!;
     await expect(
-      getDb()
-        .insert(executions)
-        .values({
-          proposalVersionId: c.version.id,
-          proposalId: s.id,
-          claimedBy: "rogue",
-          idempotencyKey: "k",
-        }),
+      getDb().insert(executions).values({
+        proposalVersionId: c.version.id,
+        proposalId: s.id,
+        claimedBy: "rogue",
+        idempotencyKey: "k",
+      }),
     ).rejects.toThrow();
   });
 });

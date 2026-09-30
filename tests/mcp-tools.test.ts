@@ -88,7 +88,9 @@ async function mcp(token: string) {
   return client;
 }
 
-const names = async (c: Client) => (await c.listTools()).tools.map((t) => t.name);
+// Propose tools only: the read-only status tools are covered in mcp-status.test.ts.
+const names = async (c: Client) =>
+  (await c.listTools()).tools.map((t) => t.name).filter((n) => !n.startsWith("action."));
 const issue = {
   owner: "acme",
   repo: "platform",
@@ -119,7 +121,9 @@ describe("dynamic proposal-tool discovery", () => {
     const s = await setup();
     await connectGithub(s);
     await updateCapabilityPolicy(s.owner, s.ws.id, "github.propose_issue", { enabled: true });
-    const [tool] = (await (await mcp(s.token)).listTools()).tools;
+    const [tool] = (await (await mcp(s.token)).listTools()).tools.filter(
+      (t) => !t.name.startsWith("action."),
+    );
     expect(tool!.description).toMatch(/does NOT create the issue/);
     expect(tool!.inputSchema.required).toEqual(expect.arrayContaining(["owner", "repo", "title"]));
     expect(tool!.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
