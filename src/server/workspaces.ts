@@ -1,8 +1,11 @@
 import "server-only";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import {
   capabilityPolicies,
+  connectorAccounts,
+  mcpGrants,
+  proposals,
   users,
   workspaceInvitations,
   workspaceMemberships,
@@ -12,6 +15,7 @@ import { getEnv } from "@/lib/env";
 import { recordAudit, type Executor } from "./audit";
 import { sendMail } from "./mailer";
 import { requirePermission } from "./authz";
+import { revokeConnector } from "./credentials";
 import { revokeUserSessions } from "./session-admin";
 import { randomToken, sha256 } from "./tokens";
 
@@ -381,5 +385,83 @@ export async function setApprovalCapabilities(
     subjectType: "user",
     subjectId: targetUserId,
     detail: { scope: caps ?? "all" },
+  });
+}
+
+export async function renameWorkspace(actorId: string, workspaceId: string, name: string) {
+  await requirePermission(actorId, workspaceId, "workspace.manage");
+  const clean = name.trim().replace(/\s+/g, " ");
+  if (clean.length < 2 || clean.length > 60)
+    throw new WorkspaceError("invalid", "Workspace name must be 2 to 60 characters");
+  await getDb().transaction(async (tx) => {
+    await tx.update(workspaces).set({ name: clean }).where(eq(workspaces.id, workspaceId));
+    await recordAudit(
+      {
+        workspaceId,
+        actorType: "user",
+        actorId,
+        action: "workspace.renamed",
+        subjectType: "workspace",
+        subjectId: workspaceId,
+      },
+      tx,
+    );
+  });
+}
+
+/**
+ * Closes a workspace (owner only, typed confirmation). Records are retained but unreachable:
+ * the workspace is hidden from every membership lookup, AI client grants are revoked, and
+ * connector credentials are deleted so nothing approved-but-unexecuted can still act.
+ */
+export async function closeWorkspace(actorId: string, workspaceId: string, confirmName: string) {
+  await requireOwner(actorId, workspaceId);
+  const [ws] = await getDb()
+    .select()
+    .from(workspaces)
+    .where(and(eq(workspaces.id, workspaceId), isNull(workspaces.deletedAt)));
+  if (!ws) throw new WorkspaceError("not_found", "Workspace not found");
+  if (confirmName.trim() !== ws.name)
+    throw new WorkspaceError("invalid", "Type the workspace name exactly to confirm");
+  const [busy] = await getDb()
+    .select({ id: proposals.id })
+    .from(proposals)
+    .where(and(eq(proposals.workspaceId, workspaceId), eq(proposals.state, "EXECUTING")))
+    .limit(1);
+  if (busy)
+    throw new WorkspaceError(
+      "conflict",
+      "An action is executing right now. Try again in a minute.",
+    );
+  const accounts = await getDb()
+    .select({ id: connectorAccounts.id })
+    .from(connectorAccounts)
+    .where(
+      and(
+        eq(connectorAccounts.workspaceId, workspaceId),
+        inArray(connectorAccounts.status, ["active", "needs_reauth"]),
+      ),
+    );
+  for (const a of accounts) await revokeConnector(a.id, "disconnected");
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(mcpGrants)
+      .set({ revokedAt: new Date() })
+      .where(and(eq(mcpGrants.workspaceId, workspaceId), isNull(mcpGrants.revokedAt)));
+    await tx
+      .update(workspaces)
+      .set({ deletedAt: new Date() })
+      .where(eq(workspaces.id, workspaceId));
+    await recordAudit(
+      {
+        workspaceId,
+        actorType: "user",
+        actorId,
+        action: "workspace.closed",
+        subjectType: "workspace",
+        subjectId: workspaceId,
+      },
+      tx,
+    );
   });
 }

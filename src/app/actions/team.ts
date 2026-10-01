@@ -6,7 +6,9 @@ import {
   WorkspaceError,
   acceptInvitation,
   changeMemberRole,
+  closeWorkspace,
   inviteMember,
+  renameWorkspace,
   removeMember,
   revokeInvitation,
   setApprovalCapabilities,
@@ -93,4 +95,31 @@ export async function setApprovalScopeAction(form: FormData) {
     picked.length === all.length ? null : [...picked],
   );
   revalidatePath("/team");
+}
+
+export async function renameWorkspaceAction(
+  _: ActionResult | null,
+  form: FormData,
+): Promise<ActionResult> {
+  try {
+    const { user, workspace } = await requireActiveContext();
+    await renameWorkspace(user.id, workspace.id, String(form.get("name") ?? ""));
+    revalidatePath("/", "layout");
+    return { ok: true, message: "Workspace renamed." };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function closeWorkspaceAction(
+  _: ActionResult | null,
+  form: FormData,
+): Promise<ActionResult> {
+  try {
+    const { user, workspace } = await requireActiveContext();
+    await closeWorkspace(user.id, workspace.id, String(form.get("confirm") ?? ""));
+  } catch (e) {
+    return fail(e);
+  }
+  redirect("/onboarding");
 }
